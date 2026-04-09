@@ -122,10 +122,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
                 return [];
 
             var q = _targetSearchText.Trim();
+            var queries = GetSearchVariants(q);
             return _allTargets
-                .Where(t => t.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase)
-                         || t.Id.Contains(q, StringComparison.OrdinalIgnoreCase)
-                         || t.Aliases.Any(a => a.Contains(q, StringComparison.OrdinalIgnoreCase)))
+                .Where(t => queries.Any(v => t.DisplayName.Contains(v, StringComparison.OrdinalIgnoreCase)
+                         || t.Id.Contains(v, StringComparison.OrdinalIgnoreCase)
+                         || t.Aliases.Any(a => a.Contains(v, StringComparison.OrdinalIgnoreCase))))
                 .Take(20)
                 .ToList();
         }
@@ -141,7 +142,8 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             var q = _starSearchText.Trim();
             return _allStars
                 .Where(s => s.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase)
-                         || s.Id.Contains(q, StringComparison.OrdinalIgnoreCase))
+                         || s.Id.Contains(q, StringComparison.OrdinalIgnoreCase)
+                         || s.Aliases.Any(a => a.Contains(q, StringComparison.OrdinalIgnoreCase)))
                 .Take(20)
                 .ToList();
         }
@@ -156,10 +158,19 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     {
         if (_isLoaded) return;
 
-        await _catalog.LoadAsync();
-        _allTargets = _catalog.GetTargets();
-        _allStars = _catalog.GetStars();
-        _isLoaded = true;
+        try
+        {
+            await _catalog.LoadAsync();
+            _allTargets = _catalog.GetTargets();
+            _allStars = _catalog.GetStars();
+            _isLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AstroFinder] Catalog load failed: {ex}");
+            ResultText = $"Failed to load catalogs: {ex.Message}";
+            HasResult = true;
+        }
     }
 
     public void SelectTarget(CatalogTarget target)
@@ -278,6 +289,27 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
     private static string FormatDelta(double degrees) =>
         degrees >= 0 ? $"+{degrees:F4}°" : $"{degrees:F4}°";
+
+    /// <summary>
+    /// Returns search variants for a query, including Messier number normalization.
+    /// "M81" yields ["M81", "M081"] so both padded and unpadded forms match.
+    /// </summary>
+    private static string[] GetSearchVariants(string query)
+    {
+        if (query.Length >= 2
+            && query[0] is 'M' or 'm'
+            && int.TryParse(query.AsSpan(1), out var num)
+            && num > 0 && num <= 110)
+        {
+            var padded = $"M{num:D3}";
+            var unpadded = $"M{num}";
+            return padded.Equals(unpadded, StringComparison.Ordinal)
+                ? [query]
+                : [query, padded, unpadded];
+        }
+
+        return [query];
+    }
 
     private void OnPropertyChanged([CallerMemberName] string? name = null)
     {
