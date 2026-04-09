@@ -11,5 +11,6 @@ public interface ICatalogProvider
     IReadOnlyList<CatalogTarget> GetTargets();
     IReadOnlyList<CatalogAsterism> GetAsterisms();
     CatalogStar? FindStarById(string id);
+    CatalogStar? FindStarByHipparcosId(int hipparcosId);
     CatalogTarget? FindTargetById(string id);
 }

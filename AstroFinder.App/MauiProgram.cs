@@ -1,5 +1,7 @@
 using AstroFinder.App.Services;
 using AstroFinder.App.ViewModels;
+using AstroFinder.App.Views;
+using AstroApps.Equipment.Profiles;
 using AstroApps.Maui.UIKit;
 using AstroApps.Maui.UIKit.Settings;
 using AstroApps.Maui.Theming;
@@ -23,10 +25,20 @@ public static class MauiProgram
         builder.Logging.AddDebug();
 #endif
 
-        // Services
+        // Equipment profiles & catalogs
+        builder.Services.AddAstroAppsEquipmentProfiles(
+            starCatalogFileSystemPath: Path.Combine(FileSystem.AppDataDirectory, "star-catalogs"),
+            asterismCatalogFileSystemPath: Path.Combine(FileSystem.AppDataDirectory, "asterism-catalogs"),
+            targetCatalogFileSystemPath: Path.Combine(FileSystem.AppDataDirectory, "target-catalogs"));
+
+        // App services
         builder.Services.AddSingleton<IUserSettingsStore, PreferencesUserSettingsStore>();
         builder.Services.AddAstroAppsThemeSettings<AstroFinderThemeSettingsAdapter>();
         builder.Services.AddSingleton<AstroFinderSettingsModuleBootstrapper>();
+        builder.Services.AddSingleton<AppCatalogProvider>();
+
+        // Pages
+        builder.Services.AddTransient<MainPage>();
 
         // ViewModels
         builder.Services.AddTransient<MainPageViewModel>();

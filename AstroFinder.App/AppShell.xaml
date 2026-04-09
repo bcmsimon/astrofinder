@@ -12,16 +12,4 @@
         ContentTemplate="{DataTemplate views:MainPage}"
         Route="MainPage" />
 
-    <ShellContent
-        Title="Settings"
-        ContentTemplate="{DataTemplate views:SettingsPage}"
-        Route="SettingsPage"
-        Shell.FlyoutItemIsVisible="False" />
-
-    <ShellContent
-        Title="About"
-        ContentTemplate="{DataTemplate views:AboutPage}"
-        Route="AboutPage"
-        Shell.FlyoutItemIsVisible="False" />
-
 </Shell>

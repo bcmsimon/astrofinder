@@ -3,6 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:ui="clr-namespace:AstroApps.Maui.UIKit.Controls;assembly=AstroApps.Maui.UIKit"
              x:Class="AstroFinder.App.Views.MainPage"
+             x:Name="Root"
              Title="AstroFinder">
 
     <Grid RowDefinitions="Auto,*" BackgroundColor="{DynamicResource ColorSurface}">
@@ -22,68 +23,176 @@
                               IconGlyph="&#x2699;"
                               Variant="Surface"
                               Size="40"
-                              Command="{Binding NavigateToSettingsCommand}" />
+                              Command="{Binding Source={x:Reference Root}, Path=OpenSettingsCommand}" />
         </Grid>
 
         <!-- Content -->
         <ScrollView Grid.Row="1" Padding="16">
-            <VerticalStackLayout Spacing="16">
+            <VerticalStackLayout Spacing="12">
 
-                <Label Text="Select a target to begin"
-                       FontSize="16"
-                       TextColor="{DynamicResource ColorOnSurface}"
-                       HorizontalTextAlignment="Center"
-                       Margin="0,32,0,0" />
+                <!-- Target Section -->
+                <ui:SectionHeader Title="Target" />
 
-                <Label Text="AstroFinder helps you locate deep-sky objects using star-hopping techniques and precise coordinate offsets."
-                       FontSize="13"
-                       TextColor="{DynamicResource ColorOnSurfaceVariant}"
-                       HorizontalTextAlignment="Center"
-                       Margin="16,8" />
+                <!-- Selected target chip -->
+                <Border IsVisible="{Binding HasSelectedTarget}"
+                        BackgroundColor="{DynamicResource ColorPrimary}"
+                        Stroke="Transparent"
+                        StrokeShape="RoundRectangle 8"
+                        Padding="12,8"
+                        HorizontalOptions="Start">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding SelectedTargetText}"
+                               TextColor="{DynamicResource ColorOnPrimary}"
+                               FontSize="14"
+                               VerticalTextAlignment="Center" />
+                        <Label Grid.Column="1"
+                               Text="✕"
+                               TextColor="{DynamicResource ColorOnPrimary}"
+                               FontSize="14"
+                               VerticalTextAlignment="Center">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ClearTargetCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </Grid>
+                </Border>
 
-                <!-- Target search placeholder -->
-                <Frame Padding="16"
-                       CornerRadius="12"
-                       BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                       BorderColor="{DynamicResource ColorOutline}"
-                       HasShadow="False"
-                       Margin="0,16,0,0">
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Target Search"
-                               FontAttributes="Bold"
-                               FontSize="15"
-                               TextColor="{DynamicResource ColorOnSurface}" />
-                        <Label Text="Search for Messier, NGC, or named deep-sky objects"
-                               FontSize="12"
-                               TextColor="{DynamicResource ColorOnSurfaceVariant}" />
-                    </VerticalStackLayout>
-                </Frame>
+                <!-- Target search -->
+                <SearchBar x:Name="TargetSearchBar"
+                           IsVisible="{Binding HasSelectedTarget, Converter={StaticResource InvertBool}}"
+                           Placeholder="Search targets (M31, NGC 7000, Orion...)"
+                           Text="{Binding TargetSearchText, Mode=TwoWay}"
+                           TextChanged="OnTargetSearchTextChanged"
+                           BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                           TextColor="{DynamicResource ColorOnSurface}"
+                           PlaceholderColor="{DynamicResource ColorOnSurfaceVariant}"
+                           CancelButtonColor="{DynamicResource ColorPrimary}" />
 
-                <!-- Quick targets placeholder -->
-                <Frame Padding="16"
-                       CornerRadius="12"
-                       BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                       BorderColor="{DynamicResource ColorOutline}"
-                       HasShadow="False">
-                    <VerticalStackLayout Spacing="8">
-                        <Label Text="Popular Targets"
-                               FontAttributes="Bold"
-                               FontSize="15"
-                               TextColor="{DynamicResource ColorOnSurface}" />
-                        <Label Text="M31 - Andromeda Galaxy"
-                               FontSize="13"
-                               TextColor="{DynamicResource ColorOnSurfaceVariant}" />
-                        <Label Text="M42 - Orion Nebula"
-                               FontSize="13"
-                               TextColor="{DynamicResource ColorOnSurfaceVariant}" />
-                        <Label Text="M81 - Bode's Galaxy"
-                               FontSize="13"
-                               TextColor="{DynamicResource ColorOnSurfaceVariant}" />
-                        <Label Text="M45 - Pleiades"
-                               FontSize="13"
-                               TextColor="{DynamicResource ColorOnSurfaceVariant}" />
-                    </VerticalStackLayout>
-                </Frame>
+                <!-- Target results -->
+                <CollectionView IsVisible="{Binding IsTargetListVisible}"
+                                ItemsSource="{Binding FilteredTargets}"
+                                SelectionMode="Single"
+                                SelectionChanged="OnTargetSelected"
+                                MaximumHeightRequest="200">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                    Stroke="{DynamicResource ColorOutline}"
+                                    StrokeThickness="1"
+                                    Padding="12,10"
+                                    StrokeShape="RoundRectangle 8">
+                                <VerticalStackLayout Spacing="2">
+                                    <Label Text="{Binding DisplayName}"
+                                           TextColor="{DynamicResource ColorOnSurface}"
+                                           FontSize="14" />
+                                    <Label Text="{Binding Category}"
+                                           TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                                           FontSize="11" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Reference Star Section -->
+                <ui:SectionHeader Title="Reference Star" Margin="0,8,0,0" />
+
+                <!-- Selected star chip -->
+                <Border IsVisible="{Binding HasSelectedStar}"
+                        BackgroundColor="{DynamicResource ColorSecondary}"
+                        Stroke="Transparent"
+                        StrokeShape="RoundRectangle 8"
+                        Padding="12,8"
+                        HorizontalOptions="Start">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label Text="{Binding SelectedStarText}"
+                               TextColor="{DynamicResource ColorOnSecondary}"
+                               FontSize="14"
+                               VerticalTextAlignment="Center" />
+                        <Label Grid.Column="1"
+                               Text="✕"
+                               TextColor="{DynamicResource ColorOnSecondary}"
+                               FontSize="14"
+                               VerticalTextAlignment="Center">
+                            <Label.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding ClearStarCommand}" />
+                            </Label.GestureRecognizers>
+                        </Label>
+                    </Grid>
+                </Border>
+
+                <!-- Star search -->
+                <SearchBar x:Name="StarSearchBar"
+                           IsVisible="{Binding HasSelectedStar, Converter={StaticResource InvertBool}}"
+                           Placeholder="Search reference stars (Vega, Polaris, Sirius...)"
+                           Text="{Binding StarSearchText, Mode=TwoWay}"
+                           TextChanged="OnStarSearchTextChanged"
+                           BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                           TextColor="{DynamicResource ColorOnSurface}"
+                           PlaceholderColor="{DynamicResource ColorOnSurfaceVariant}"
+                           CancelButtonColor="{DynamicResource ColorPrimary}" />
+
+                <!-- Star results -->
+                <CollectionView IsVisible="{Binding IsStarListVisible}"
+                                ItemsSource="{Binding FilteredStars}"
+                                SelectionMode="Single"
+                                SelectionChanged="OnStarSelected"
+                                MaximumHeightRequest="200">
+                    <CollectionView.ItemsLayout>
+                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                    </CollectionView.ItemsLayout>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                    Stroke="{DynamicResource ColorOutline}"
+                                    StrokeThickness="1"
+                                    Padding="12,10"
+                                    StrokeShape="RoundRectangle 8">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <Label Text="{Binding DisplayName}"
+                                           TextColor="{DynamicResource ColorOnSurface}"
+                                           FontSize="14" />
+                                    <Label Grid.Column="1"
+                                           Text="{Binding VisualMagnitude, StringFormat='mag {0:F1}'}"
+                                           TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                                           FontSize="11"
+                                           VerticalTextAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <!-- Action Buttons -->
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,16,0,0">
+                    <ui:AppButton Grid.Column="0"
+                                  Text="Build Star Hop Map"
+                                  Variant="Primary"
+                                  Command="{Binding BuildMapCommand}" />
+
+                    <ui:AppButton Grid.Column="1"
+                                  Text="Show RA/Dec Deltas"
+                                  Variant="Secondary"
+                                  Command="{Binding ShowDeltasCommand}" />
+                </Grid>
+
+                <!-- Results -->
+                <Border IsVisible="{Binding HasResult}"
+                        BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                        Stroke="{DynamicResource ColorOutline}"
+                        StrokeThickness="1"
+                        Padding="16"
+                        StrokeShape="RoundRectangle 12"
+                        Margin="0,8,0,16">
+                    <Label Text="{Binding ResultText}"
+                           TextColor="{DynamicResource ColorOnSurface}"
+                           FontSize="13"
+                           FontFamily="Consolas"
+                           LineBreakMode="WordWrap" />
+                </Border>
 
             </VerticalStackLayout>
         </ScrollView>

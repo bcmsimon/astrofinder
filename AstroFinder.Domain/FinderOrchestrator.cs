@@ -43,7 +43,7 @@ public sealed class FinderOrchestrator
         var anchor = _anchorSelector.FindBestAnchor(
             targetCoord,
             _catalogProvider.GetAsterisms(),
-            _catalogProvider.FindStarById);
+            _catalogProvider.FindStarByHipparcosId);
 
         // Generate hop route
         HopRoute? route = null;

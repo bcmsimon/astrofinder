@@ -18,7 +18,7 @@ public sealed class AnchorSelector
     public AnchorResult? FindBestAnchor(
         EquatorialCoordinate target,
         IReadOnlyList<CatalogAsterism> asterisms,
-        Func<string, CatalogStar?> starLookup)
+        Func<int, CatalogStar?> starLookup)
     {
         AnchorResult? best = null;
 
@@ -41,7 +41,7 @@ public sealed class AnchorSelector
                 }
 
                 double proximityScore = 1.0 - (distance / MaxSearchRadiusDegrees);
-                double familiarityScore = Math.Min(asterism.FamiliarityScore, 1.0);
+                double familiarityScore = Math.Min(asterism.FamiliarityScore / 10.0, 1.0);
                 double alignmentScore = ComputeAlignmentScore(asterism, target, starLookup);
 
                 double totalScore =
@@ -68,7 +68,7 @@ public sealed class AnchorSelector
     private static double ComputeAlignmentScore(
         CatalogAsterism asterism,
         EquatorialCoordinate target,
-        Func<string, CatalogStar?> starLookup)
+        Func<int, CatalogStar?> starLookup)
     {
         if (asterism.StarIds.Count < 2)
         {

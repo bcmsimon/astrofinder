@@ -22,6 +22,7 @@ public class FinderOrchestratorTests
         public IReadOnlyList<CatalogTarget> GetTargets() => _targets;
         public IReadOnlyList<CatalogAsterism> GetAsterisms() => _asterisms;
         public CatalogStar? FindStarById(string id) => _stars.FirstOrDefault(s => s.Id == id);
+        public CatalogStar? FindStarByHipparcosId(int hipparcosId) => _stars.FirstOrDefault(s => s.HipparcosId == hipparcosId);
         public CatalogTarget? FindTargetById(string id) => _targets.FirstOrDefault(t => t.Id == id);
     }
 
@@ -38,15 +39,16 @@ public class FinderOrchestratorTests
         });
         catalog.AddStar(new CatalogStar
         {
-            Id = "alpheratz", DisplayName = "Alpheratz",
+            Id = "alpheratz", DisplayName = "Alpheratz", HipparcosId = 677,
             RightAscensionHours = 0.1398, DeclinationDeg = 29.091, VisualMagnitude = 2.06,
         });
         catalog.AddAsterism(new CatalogAsterism
         {
             Id = "great-square",
             DisplayName = "Great Square of Pegasus",
-            StarIds = new List<string> { "alpheratz" },
-            FamiliarityScore = 0.8,
+            StarIds = new List<int> { 677 },
+            Segments = new List<int[]>(),
+            FamiliarityScore = 8,
         });
 
         var orchestrator = new FinderOrchestrator(

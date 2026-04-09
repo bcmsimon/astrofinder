@@ -8,20 +8,30 @@ public class AnchorSelectorTests
 {
     private static readonly CatalogStar Dubhe = new()
     {
-        Id = "dubhe", DisplayName = "Dubhe", RightAscensionHours = 11.062, DeclinationDeg = 61.751, VisualMagnitude = 1.79,
+        Id = "dubhe", DisplayName = "Dubhe", HipparcosId = 54061,
+        RightAscensionHours = 11.062, DeclinationDeg = 61.751, VisualMagnitude = 1.79,
     };
 
     private static readonly CatalogStar Merak = new()
     {
-        Id = "merak", DisplayName = "Merak", RightAscensionHours = 11.031, DeclinationDeg = 56.382, VisualMagnitude = 2.37,
+        Id = "merak", DisplayName = "Merak", HipparcosId = 53910,
+        RightAscensionHours = 11.031, DeclinationDeg = 56.382, VisualMagnitude = 2.37,
     };
 
     private static readonly CatalogAsterism BigDipperPointers = new()
     {
         Id = "big-dipper-pointers",
         DisplayName = "Big Dipper Pointers",
-        StarIds = new List<string> { "merak", "dubhe" },
-        FamiliarityScore = 1.0,
+        StarIds = new List<int> { 53910, 54061 },
+        Segments = new List<int[]> { new[] { 53910, 54061 } },
+        FamiliarityScore = 10,
+    };
+
+    private static CatalogStar? LookupByHip(int hipId) => hipId switch
+    {
+        54061 => Dubhe,
+        53910 => Merak,
+        _ => null,
     };
 
     [Fact]
@@ -34,12 +44,7 @@ public class AnchorSelectorTests
         var result = selector.FindBestAnchor(
             target,
             new[] { BigDipperPointers },
-            id => id switch
-            {
-                "dubhe" => Dubhe,
-                "merak" => Merak,
-                _ => null,
-            });
+            LookupByHip);
 
         Assert.NotNull(result);
         Assert.Equal("Big Dipper Pointers", result.Asterism.DisplayName);
@@ -70,12 +75,7 @@ public class AnchorSelectorTests
         var result = selector.FindBestAnchor(
             target,
             new[] { BigDipperPointers },
-            id => id switch
-            {
-                "dubhe" => Dubhe,
-                "merak" => Merak,
-                _ => null,
-            });
+            LookupByHip);
 
         Assert.Null(result);
     }
