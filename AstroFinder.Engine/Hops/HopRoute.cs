@@ -1,4 +1,4 @@
-using AstroFinder.Engine.Catalog;
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Primitives;
 
 namespace AstroFinder.Engine.Hops;
@@ -9,7 +9,7 @@ namespace AstroFinder.Engine.Hops;
 /// </summary>
 public sealed class HopRoute
 {
-    public required TargetEntry Target { get; init; }
+    public required CatalogTarget Target { get; init; }
     public required IReadOnlyList<HopStep> Steps { get; init; }
     public required double TotalAngularDistanceDegrees { get; init; }
 }

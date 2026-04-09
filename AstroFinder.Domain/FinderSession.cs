@@ -1,5 +1,5 @@
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Anchors;
-using AstroFinder.Engine.Catalog;
 using AstroFinder.Engine.Hops;
 using AstroFinder.Engine.Primitives;
 
@@ -11,7 +11,7 @@ namespace AstroFinder.Domain;
 /// </summary>
 public sealed class FinderSession
 {
-    public required TargetEntry Target { get; init; }
+    public required CatalogTarget Target { get; init; }
     public required AnchorResult? Anchor { get; init; }
     public required HopRoute? Route { get; init; }
     public required RelativePosition? RelativePosition { get; init; }

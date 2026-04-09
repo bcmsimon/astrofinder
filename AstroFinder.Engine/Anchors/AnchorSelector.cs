@@ -1,4 +1,4 @@
-using AstroFinder.Engine.Catalog;
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Geometry;
 using AstroFinder.Engine.Primitives;
 
@@ -17,8 +17,8 @@ public sealed class AnchorSelector
 
     public AnchorResult? FindBestAnchor(
         EquatorialCoordinate target,
-        IReadOnlyList<AsterismEntry> asterisms,
-        Func<string, StarEntry?> starLookup)
+        IReadOnlyList<CatalogAsterism> asterisms,
+        Func<string, CatalogStar?> starLookup)
     {
         AnchorResult? best = null;
 
@@ -32,7 +32,7 @@ public sealed class AnchorSelector
                     continue;
                 }
 
-                var starCoord = new EquatorialCoordinate(star.RaHours, star.DecDegrees);
+                var starCoord = new EquatorialCoordinate(star.RightAscensionHours, star.DeclinationDeg);
                 double distance = SphericalGeometry.AngularSeparationDegrees(starCoord, target);
 
                 if (distance > MaxSearchRadiusDegrees)
@@ -66,9 +66,9 @@ public sealed class AnchorSelector
     }
 
     private static double ComputeAlignmentScore(
-        AsterismEntry asterism,
+        CatalogAsterism asterism,
         EquatorialCoordinate target,
-        Func<string, StarEntry?> starLookup)
+        Func<string, CatalogStar?> starLookup)
     {
         if (asterism.StarIds.Count < 2)
         {
@@ -83,8 +83,8 @@ public sealed class AnchorSelector
             return 0.0;
         }
 
-        var coord1 = new EquatorialCoordinate(star1.RaHours, star1.DecDegrees);
-        var coord2 = new EquatorialCoordinate(star2.RaHours, star2.DecDegrees);
+        var coord1 = new EquatorialCoordinate(star1.RightAscensionHours, star1.DeclinationDeg);
+        var coord2 = new EquatorialCoordinate(star2.RightAscensionHours, star2.DeclinationDeg);
 
         double paLine = SphericalGeometry.PositionAngleDegrees(coord1, coord2);
         double paTarget = SphericalGeometry.PositionAngleDegrees(coord2, target);

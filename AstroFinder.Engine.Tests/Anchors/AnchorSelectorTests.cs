@@ -1,26 +1,26 @@
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Anchors;
-using AstroFinder.Engine.Catalog;
 using AstroFinder.Engine.Primitives;
 
 namespace AstroFinder.Engine.Tests.Anchors;
 
 public class AnchorSelectorTests
 {
-    private static readonly StarEntry Dubhe = new()
+    private static readonly CatalogStar Dubhe = new()
     {
-        Id = "HIP54061", Name = "Dubhe", RaHours = 11.062, DecDegrees = 61.751, Magnitude = 1.79,
+        Id = "dubhe", DisplayName = "Dubhe", RightAscensionHours = 11.062, DeclinationDeg = 61.751, VisualMagnitude = 1.79,
     };
 
-    private static readonly StarEntry Merak = new()
+    private static readonly CatalogStar Merak = new()
     {
-        Id = "HIP53910", Name = "Merak", RaHours = 11.031, DecDegrees = 56.382, Magnitude = 2.37,
+        Id = "merak", DisplayName = "Merak", RightAscensionHours = 11.031, DeclinationDeg = 56.382, VisualMagnitude = 2.37,
     };
 
-    private static readonly AsterismEntry BigDipperPointers = new()
+    private static readonly CatalogAsterism BigDipperPointers = new()
     {
         Id = "big-dipper-pointers",
-        Name = "Big Dipper Pointers",
-        StarIds = new[] { "HIP53910", "HIP54061" },
+        DisplayName = "Big Dipper Pointers",
+        StarIds = new List<string> { "merak", "dubhe" },
         FamiliarityScore = 1.0,
     };
 
@@ -36,13 +36,13 @@ public class AnchorSelectorTests
             new[] { BigDipperPointers },
             id => id switch
             {
-                "HIP54061" => Dubhe,
-                "HIP53910" => Merak,
+                "dubhe" => Dubhe,
+                "merak" => Merak,
                 _ => null,
             });
 
         Assert.NotNull(result);
-        Assert.Equal("Big Dipper Pointers", result.Asterism.Name);
+        Assert.Equal("Big Dipper Pointers", result.Asterism.DisplayName);
         Assert.True(result.Score > 0);
     }
 
@@ -54,7 +54,7 @@ public class AnchorSelectorTests
 
         var result = selector.FindBestAnchor(
             target,
-            Array.Empty<AsterismEntry>(),
+            Array.Empty<CatalogAsterism>(),
             _ => null);
 
         Assert.Null(result);
@@ -72,8 +72,8 @@ public class AnchorSelectorTests
             new[] { BigDipperPointers },
             id => id switch
             {
-                "HIP54061" => Dubhe,
-                "HIP53910" => Merak,
+                "dubhe" => Dubhe,
+                "merak" => Merak,
                 _ => null,
             });
 

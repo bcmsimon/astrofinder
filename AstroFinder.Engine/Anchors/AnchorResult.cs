@@ -1,4 +1,4 @@
-using AstroFinder.Engine.Catalog;
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Primitives;
 
 namespace AstroFinder.Engine.Anchors;
@@ -9,8 +9,8 @@ namespace AstroFinder.Engine.Anchors;
 /// </summary>
 public sealed class AnchorResult
 {
-    public required AsterismEntry Asterism { get; init; }
-    public required StarEntry AnchorStar { get; init; }
+    public required CatalogAsterism Asterism { get; init; }
+    public required CatalogStar AnchorStar { get; init; }
     public required double AngularDistanceDegrees { get; init; }
     public required double Score { get; init; }
 }

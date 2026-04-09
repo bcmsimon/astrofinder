@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\astroprofiles\src\AstroApps.Equipment.Profiles\AstroApps.Equipment.Profiles.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -1,36 +1,37 @@
-using AstroFinder.Engine.Catalog;
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Hops;
 
 namespace AstroFinder.Engine.Tests.Hops;
 
 public class HopGeneratorTests
 {
-    private static readonly StarEntry StarA = new()
+    private static readonly CatalogStar StarA = new()
     {
-        Id = "S1", Name = "Alpha", RaHours = 10.0, DecDegrees = 60.0, Magnitude = 2.0,
+        Id = "S1", DisplayName = "Alpha", RightAscensionHours = 10.0, DeclinationDeg = 60.0, VisualMagnitude = 2.0,
     };
 
-    private static readonly StarEntry StarB = new()
+    private static readonly CatalogStar StarB = new()
     {
-        Id = "S2", Name = "Beta", RaHours = 10.2, DecDegrees = 63.0, Magnitude = 3.0,
+        Id = "S2", DisplayName = "Beta", RightAscensionHours = 10.2, DeclinationDeg = 63.0, VisualMagnitude = 3.0,
     };
 
-    private static readonly StarEntry StarC = new()
+    private static readonly CatalogStar StarC = new()
     {
-        Id = "S3", Name = "Gamma", RaHours = 10.3, DecDegrees = 66.0, Magnitude = 3.5,
+        Id = "S3", DisplayName = "Gamma", RightAscensionHours = 10.3, DeclinationDeg = 66.0, VisualMagnitude = 3.5,
     };
 
-    private static readonly TargetEntry TargetM81 = new()
+    private static readonly CatalogTarget TargetM81 = new()
     {
-        Id = "M81", Name = "M81", CommonName = "Bode's Galaxy",
-        RaHours = 9.93, DecDegrees = 69.07, ObjectType = "Galaxy",
+        Id = "M81", DisplayName = "M81",
+        RightAscensionHours = 9.93, DeclinationDeg = 69.07,
+        Category = AstroApps.Equipment.Profiles.Enums.ShootingTargetCategory.Galaxy,
     };
 
     [Fact]
     public void GenerateRoute_WithAvailableStars_ProducesSteps()
     {
         var generator = new HopGenerator();
-        var stars = new List<StarEntry> { StarA, StarB, StarC };
+        var stars = new List<CatalogStar> { StarA, StarB, StarC };
 
         var route = generator.GenerateRoute(StarA, TargetM81, stars);
 
@@ -44,7 +45,7 @@ public class HopGeneratorTests
     {
         var generator = new HopGenerator();
 
-        var route = generator.GenerateRoute(StarA, TargetM81, Array.Empty<StarEntry>());
+        var route = generator.GenerateRoute(StarA, TargetM81, Array.Empty<CatalogStar>());
 
         Assert.NotNull(route);
         Assert.Empty(route.Steps);
@@ -54,7 +55,7 @@ public class HopGeneratorTests
     public void GenerateRoute_TotalDistance_IsPositive()
     {
         var generator = new HopGenerator();
-        var stars = new List<StarEntry> { StarA, StarB, StarC };
+        var stars = new List<CatalogStar> { StarA, StarB, StarC };
 
         var route = generator.GenerateRoute(StarA, TargetM81, stars);
 

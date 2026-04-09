@@ -1,3 +1,4 @@
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Domain;
 using AstroFinder.Engine.Anchors;
 using AstroFinder.Engine.Catalog;
@@ -9,39 +10,42 @@ public class FinderOrchestratorTests
 {
     private sealed class TestCatalogProvider : ICatalogProvider
     {
-        private readonly List<StarEntry> _stars = new();
-        private readonly List<TargetEntry> _targets = new();
-        private readonly List<AsterismEntry> _asterisms = new();
+        private readonly List<CatalogStar> _stars = new();
+        private readonly List<CatalogTarget> _targets = new();
+        private readonly List<CatalogAsterism> _asterisms = new();
 
-        public void AddStar(StarEntry star) => _stars.Add(star);
-        public void AddTarget(TargetEntry target) => _targets.Add(target);
-        public void AddAsterism(AsterismEntry asterism) => _asterisms.Add(asterism);
+        public void AddStar(CatalogStar star) => _stars.Add(star);
+        public void AddTarget(CatalogTarget target) => _targets.Add(target);
+        public void AddAsterism(CatalogAsterism asterism) => _asterisms.Add(asterism);
 
-        public IReadOnlyList<StarEntry> GetStars() => _stars;
-        public IReadOnlyList<TargetEntry> GetTargets() => _targets;
-        public IReadOnlyList<AsterismEntry> GetAsterisms() => _asterisms;
-        public StarEntry? FindStarById(string id) => _stars.FirstOrDefault(s => s.Id == id);
-        public TargetEntry? FindTargetById(string id) => _targets.FirstOrDefault(t => t.Id == id);
+        public IReadOnlyList<CatalogStar> GetStars() => _stars;
+        public IReadOnlyList<CatalogTarget> GetTargets() => _targets;
+        public IReadOnlyList<CatalogAsterism> GetAsterisms() => _asterisms;
+        public CatalogStar? FindStarById(string id) => _stars.FirstOrDefault(s => s.Id == id);
+        public CatalogTarget? FindTargetById(string id) => _targets.FirstOrDefault(t => t.Id == id);
     }
 
     [Fact]
     public void CreateSession_KnownTarget_ReturnsSession()
     {
         var catalog = new TestCatalogProvider();
-        catalog.AddTarget(new TargetEntry
+        catalog.AddTarget(new CatalogTarget
         {
-            Id = "M31", Name = "M31", CommonName = "Andromeda Galaxy",
-            RaHours = 0.712, DecDegrees = 41.269, ObjectType = "Galaxy",
+            Id = "M31", DisplayName = "M31",
+            Aliases = new List<string> { "Andromeda Galaxy" },
+            RightAscensionHours = 0.712, DeclinationDeg = 41.269,
+            Category = AstroApps.Equipment.Profiles.Enums.ShootingTargetCategory.Galaxy,
         });
-        catalog.AddStar(new StarEntry
+        catalog.AddStar(new CatalogStar
         {
-            Id = "HIP677", Name = "Alpheratz", RaHours = 0.1398, DecDegrees = 29.091, Magnitude = 2.06,
+            Id = "alpheratz", DisplayName = "Alpheratz",
+            RightAscensionHours = 0.1398, DeclinationDeg = 29.091, VisualMagnitude = 2.06,
         });
-        catalog.AddAsterism(new AsterismEntry
+        catalog.AddAsterism(new CatalogAsterism
         {
             Id = "great-square",
-            Name = "Great Square of Pegasus",
-            StarIds = new[] { "HIP677" },
+            DisplayName = "Great Square of Pegasus",
+            StarIds = new List<string> { "alpheratz" },
             FamiliarityScore = 0.8,
         });
 

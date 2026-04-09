@@ -1,4 +1,4 @@
-using AstroFinder.Engine.Catalog;
+using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.Engine.Geometry;
 using AstroFinder.Engine.Primitives;
 
@@ -17,12 +17,12 @@ public sealed class HopGenerator
     /// selecting intermediate bright stars as waypoints.
     /// </summary>
     public HopRoute GenerateRoute(
-        StarEntry startStar,
-        TargetEntry target,
-        IReadOnlyList<StarEntry> availableStars,
+        CatalogStar startStar,
+        CatalogTarget target,
+        IReadOnlyList<CatalogStar> availableStars,
         double magnitudeLimit = 5.0)
     {
-        var targetCoord = new EquatorialCoordinate(target.RaHours, target.DecDegrees);
+        var targetCoord = new EquatorialCoordinate(target.RightAscensionHours, target.DeclinationDeg);
         var steps = new List<HopStep>();
         var current = startStar;
         var visited = new HashSet<string> { startStar.Id };
@@ -32,7 +32,7 @@ public sealed class HopGenerator
 
         for (int i = 0; i < maxSteps; i++)
         {
-            var currentCoord = new EquatorialCoordinate(current.RaHours, current.DecDegrees);
+            var currentCoord = new EquatorialCoordinate(current.RightAscensionHours, current.DeclinationDeg);
             double distanceToTarget = SphericalGeometry.AngularSeparationDegrees(currentCoord, targetCoord);
 
             if (distanceToTarget <= TargetProximityDegrees)
@@ -46,7 +46,7 @@ public sealed class HopGenerator
                 break;
             }
 
-            var nextCoord = new EquatorialCoordinate(next.RaHours, next.DecDegrees);
+            var nextCoord = new EquatorialCoordinate(next.RightAscensionHours, next.DeclinationDeg);
             double stepDistance = SphericalGeometry.AngularSeparationDegrees(currentCoord, nextCoord);
 
             string instruction = FormatInstruction(current, next, stepDistance);
@@ -72,27 +72,27 @@ public sealed class HopGenerator
         };
     }
 
-    private static StarEntry? FindBestNextHop(
-        StarEntry current,
+    private static CatalogStar? FindBestNextHop(
+        CatalogStar current,
         EquatorialCoordinate target,
-        IReadOnlyList<StarEntry> stars,
+        IReadOnlyList<CatalogStar> stars,
         HashSet<string> visited,
         double magnitudeLimit)
     {
-        var currentCoord = new EquatorialCoordinate(current.RaHours, current.DecDegrees);
+        var currentCoord = new EquatorialCoordinate(current.RightAscensionHours, current.DeclinationDeg);
         double currentDistToTarget = SphericalGeometry.AngularSeparationDegrees(currentCoord, target);
 
-        StarEntry? bestCandidate = null;
+        CatalogStar? bestCandidate = null;
         double bestScore = double.MinValue;
 
         foreach (var star in stars)
         {
-            if (visited.Contains(star.Id) || star.Magnitude > magnitudeLimit)
+            if (visited.Contains(star.Id) || star.VisualMagnitude > magnitudeLimit)
             {
                 continue;
             }
 
-            var starCoord = new EquatorialCoordinate(star.RaHours, star.DecDegrees);
+            var starCoord = new EquatorialCoordinate(star.RightAscensionHours, star.DeclinationDeg);
             double distFromCurrent = SphericalGeometry.AngularSeparationDegrees(currentCoord, starCoord);
 
             if (distFromCurrent > MaxStepDistanceDegrees || distFromCurrent < 0.5)
@@ -104,7 +104,7 @@ public sealed class HopGenerator
 
             // Prefer stars that are closer to the target and reasonably bright
             double progressScore = (currentDistToTarget - distToTarget) / currentDistToTarget;
-            double brightnessScore = 1.0 - (star.Magnitude / magnitudeLimit);
+            double brightnessScore = 1.0 - (star.VisualMagnitude / magnitudeLimit);
             double score = (progressScore * 0.7) + (brightnessScore * 0.3);
 
             if (score > bestScore)
@@ -117,10 +117,10 @@ public sealed class HopGenerator
         return bestCandidate;
     }
 
-    private static string FormatInstruction(StarEntry from, StarEntry to, double distance)
+    private static string FormatInstruction(CatalogStar from, CatalogStar to, double distance)
     {
-        string fromName = from.Name ?? from.Id;
-        string toName = to.Name ?? to.Id;
+        string fromName = string.IsNullOrEmpty(from.DisplayName) ? from.Id : from.DisplayName;
+        string toName = string.IsNullOrEmpty(to.DisplayName) ? to.Id : to.DisplayName;
         string distText = distance < 1.0
             ? $"{distance * 60.0:F0} arcmin"
             : $"{distance:F1}°";

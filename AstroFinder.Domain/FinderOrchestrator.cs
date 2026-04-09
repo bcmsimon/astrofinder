@@ -37,7 +37,7 @@ public sealed class FinderOrchestrator
             throw new ArgumentException($"Target '{targetId}' not found in catalog.", nameof(targetId));
         }
 
-        var targetCoord = new EquatorialCoordinate(target.RaHours, target.DecDegrees);
+        var targetCoord = new EquatorialCoordinate(target.RightAscensionHours, target.DeclinationDeg);
 
         // Find best anchor asterism
         var anchor = _anchorSelector.FindBestAnchor(
@@ -59,7 +59,7 @@ public sealed class FinderOrchestrator
         RelativePosition? relativePos = null;
         if (anchor is not null)
         {
-            var anchorCoord = new EquatorialCoordinate(anchor.AnchorStar.RaHours, anchor.AnchorStar.DecDegrees);
+            var anchorCoord = new EquatorialCoordinate(anchor.AnchorStar.RightAscensionHours, anchor.AnchorStar.DeclinationDeg);
             relativePos = SphericalGeometry.ComputeRelativePosition(anchorCoord, targetCoord);
         }
 

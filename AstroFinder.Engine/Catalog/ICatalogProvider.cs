@@ -1,3 +1,5 @@
+using AstroApps.Equipment.Profiles.Models;
+
 namespace AstroFinder.Engine.Catalog;
 
 /// <summary>
@@ -5,9 +7,9 @@ namespace AstroFinder.Engine.Catalog;
 /// </summary>
 public interface ICatalogProvider
 {
-    IReadOnlyList<StarEntry> GetStars();
-    IReadOnlyList<TargetEntry> GetTargets();
-    IReadOnlyList<AsterismEntry> GetAsterisms();
-    StarEntry? FindStarById(string id);
-    TargetEntry? FindTargetById(string id);
+    IReadOnlyList<CatalogStar> GetStars();
+    IReadOnlyList<CatalogTarget> GetTargets();
+    IReadOnlyList<CatalogAsterism> GetAsterisms();
+    CatalogStar? FindStarById(string id);
+    CatalogTarget? FindTargetById(string id);
 }
