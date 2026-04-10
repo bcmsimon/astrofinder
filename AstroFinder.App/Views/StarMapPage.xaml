@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="AstroFinder.App.Views.StarMapPage"
+             Title="Star Hop Map"
+             BackgroundColor="{DynamicResource ColorBackground}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12" Padding="16">
+
+        <!-- Close button header -->
+        <Border Grid.Row="0"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <Label Text="Star Hop Map"
+                       FontSize="16"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource ColorTextPrimary}"
+                       VerticalOptions="Center" />
+                <Button Grid.Column="1"
+                        Text="Reset"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorPrimary}"
+                        FontSize="14"
+                        Clicked="OnResetClicked" />
+                <Button Grid.Column="2"
+                        Text="Close"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorPrimary}"
+                        FontSize="14"
+                        Clicked="OnCloseClicked" />
+            </Grid>
+        </Border>
+
+        <!-- Star map canvas -->
+        <Border x:Name="MapViewport"
+                Grid.Row="1"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 16"
+                Padding="8">
+            <WebView x:Name="MapWebView"
+                     BackgroundColor="Transparent"
+                     HorizontalOptions="Fill"
+                     VerticalOptions="Fill" />
+        </Border>
+
+        <!-- Route summary -->
+        <Border Grid.Row="2"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <Label x:Name="SummaryLabel"
+                   FontSize="12"
+                   TextColor="{DynamicResource ColorTextSecondary}"
+                   LineBreakMode="WordWrap" />
+        </Border>
+
+    </Grid>
+
+</ContentPage>

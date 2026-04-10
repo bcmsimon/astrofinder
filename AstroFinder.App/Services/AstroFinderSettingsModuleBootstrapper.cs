@@ -1,3 +1,4 @@
+using AstroFinder.App.Views;
 using AstroApps.Maui.UIKit.Pages.Settings;
 using AstroApps.Maui.UIKit.Settings;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,6 +38,15 @@ public sealed class AstroFinderSettingsModuleBootstrapper
             section: SettingsModuleSection.General,
             createPage: () => _services.GetRequiredService<ThemeSettingsPage>(),
             order: 10));
+
+        _registry.AddModule(new SettingsModuleDefinition(
+            id: "astrofinder-orientation",
+            title: "Sky orientation",
+            description: "Use your location and current time to orient star hop maps to match the sky.",
+            iconGlyph: "",
+            section: SettingsModuleSection.General,
+            createPage: () => _services.GetRequiredService<SettingsPage>(),
+            order: 20));
 
         _registry.AddModule(new SettingsModuleDefinition(
             id: "astrofinder-about",

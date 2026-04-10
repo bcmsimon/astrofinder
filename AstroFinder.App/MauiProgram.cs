@@ -36,9 +36,11 @@ public static class MauiProgram
         builder.Services.AddAstroAppsThemeSettings<AstroFinderThemeSettingsAdapter>();
         builder.Services.AddSingleton<AstroFinderSettingsModuleBootstrapper>();
         builder.Services.AddSingleton<AppCatalogProvider>();
+        builder.Services.AddSingleton<ObserverOrientationService>();
 
         // Pages
         builder.Services.AddTransient<MainPage>();
+        builder.Services.AddTransient<SettingsPage>();
 
         // ViewModels
         builder.Services.AddTransient<MainPageViewModel>();

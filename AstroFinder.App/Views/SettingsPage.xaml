@@ -2,29 +2,61 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AstroFinder.App.Views.SettingsPage"
-             Title="Settings">
+             Title="Sky orientation"
+             BackgroundColor="{DynamicResource ColorBackground}">
 
-    <Grid RowDefinitions="Auto,*" BackgroundColor="{DynamicResource ColorSurface}">
+    <Grid RowDefinitions="Auto,*" RowSpacing="12" Padding="16">
 
-        <Grid Grid.Row="0" Padding="16,12" ColumnDefinitions="Auto,*,Auto"
-              BackgroundColor="{DynamicResource ColorSurfaceAlt}">
-
-            <Label Grid.Column="1"
-                   Text="Settings"
-                   HorizontalTextAlignment="Center"
-                   VerticalTextAlignment="Center"
+        <Border Grid.Row="0"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <Label Text="Sky orientation"
                    FontAttributes="Bold"
                    FontSize="20"
                    TextColor="{DynamicResource ColorPrimary}" />
-        </Grid>
+        </Border>
 
-        <ScrollView Grid.Row="1" Padding="16">
+        <ScrollView Grid.Row="1">
             <VerticalStackLayout Spacing="12">
-                <Label Text="Settings will be available here."
-                       FontSize="14"
-                       TextColor="{DynamicResource ColorOnSurfaceVariant}"
-                       HorizontalTextAlignment="Center"
-                       Margin="0,32,0,0" />
+                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                        Stroke="{DynamicResource ColorBorder}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 14"
+                        Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Use my location for sky-aligned maps"
+                                       FontAttributes="Bold"
+                                       FontSize="15"
+                                       TextColor="{DynamicResource ColorTextPrimary}" />
+                                <Label Text="When enabled, AstroFinder uses your location and the current time to rotate the star hop chart to match the sky you are looking at."
+                                       FontSize="13"
+                                       TextColor="{DynamicResource ColorTextSecondary}"
+                                       LineBreakMode="WordWrap" />
+                            </VerticalStackLayout>
+
+                            <Switch Grid.Column="1"
+                                    x:Name="LocationToggle"
+                                    IsToggled="{Binding UseLocationOrientation}"
+                                    OnColor="{DynamicResource ColorPrimary}"
+                                    Toggled="OnLocationToggleChanged"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <ActivityIndicator IsVisible="{Binding IsBusy}"
+                                           IsRunning="{Binding IsBusy}"
+                                           Color="{DynamicResource ColorPrimary}" />
+
+                        <Label Text="{Binding StatusText}"
+                               FontSize="12"
+                               TextColor="{DynamicResource ColorTextSecondary}"
+                               LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </Border>
             </VerticalStackLayout>
         </ScrollView>
 

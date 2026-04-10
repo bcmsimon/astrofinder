@@ -7,7 +7,7 @@
     <Grid RowDefinitions="Auto,*" BackgroundColor="{DynamicResource ColorSurface}">
 
         <Grid Grid.Row="0" Padding="16,12" ColumnDefinitions="Auto,*,Auto"
-              BackgroundColor="{DynamicResource ColorSurfaceAlt}">
+              BackgroundColor="{DynamicResource ColorSurface}">
 
             <Label Grid.Column="1"
                    Text="About"
@@ -29,18 +29,18 @@
 
                 <Label Text="Version 1.0"
                        FontSize="14"
-                       TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                       TextColor="{DynamicResource ColorTextSecondary}"
                        HorizontalTextAlignment="Center" />
 
                 <Label Text="Astrophotography sky navigation and framing assistant. Locate deep-sky objects using star-hopping techniques and precise coordinate offsets."
                        FontSize="13"
-                       TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                       TextColor="{DynamicResource ColorTextSecondary}"
                        HorizontalTextAlignment="Center"
                        Margin="16,8" />
 
                 <Label Text="Part of the AstroApps ecosystem."
                        FontSize="12"
-                       TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                       TextColor="{DynamicResource ColorTextSecondary}"
                        HorizontalTextAlignment="Center"
                        Margin="0,16,0,0" />
             </VerticalStackLayout>

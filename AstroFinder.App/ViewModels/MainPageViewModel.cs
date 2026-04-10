@@ -7,12 +7,14 @@ using AstroFinder.Engine.Anchors;
 using AstroFinder.Engine.Geometry;
 using AstroFinder.Engine.Hops;
 using AstroFinder.Engine.Primitives;
+using AstroFinder.App.Views;
 
 namespace AstroFinder.App.ViewModels;
 
 public sealed class MainPageViewModel : INotifyPropertyChanged
 {
     private readonly AppCatalogProvider _catalog;
+    private readonly ObserverOrientationService _observerOrientationService;
     private readonly AnchorSelector _anchorSelector = new();
     private readonly HopGenerator _hopGenerator = new();
 
@@ -27,17 +29,23 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private bool _hasResult;
     private bool _isLoaded;
 
-    public MainPageViewModel(AppCatalogProvider catalog)
+    public MainPageViewModel(AppCatalogProvider catalog, ObserverOrientationService observerOrientationService)
     {
         _catalog = catalog;
+        _observerOrientationService = observerOrientationService;
 
-        BuildMapCommand = new Command(BuildStarHopMap, () => _selectedTarget is not null);
+        BuildMapCommand = new Command(async () => await BuildStarHopMapAsync(), () => _selectedTarget is not null);
         ShowDeltasCommand = new Command(ShowDeltas, () => _selectedTarget is not null && _selectedStar is not null);
         ClearTargetCommand = new Command(ClearTarget);
         ClearStarCommand = new Command(ClearStar);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    /// <summary>
+    /// Raised when a star map has been computed and should be displayed.
+    /// </summary>
+    public event Action<StarMapData>? ShowStarMap;
 
     public string TargetSearchText
     {
@@ -201,7 +209,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         StarSearchText = string.Empty;
     }
 
-    private void BuildStarHopMap()
+    private async Task BuildStarHopMapAsync()
     {
         if (_selectedTarget is null) return;
 
@@ -221,6 +229,15 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         }
 
         var route = _hopGenerator.GenerateRoute(anchor.AnchorStar, _selectedTarget, _catalog.GetStars());
+        var useObserverOrientationRequested = _observerOrientationService.IsLocationOrientationEnabled;
+        var observerContext = await _observerOrientationService.TryGetObserverContextAsync();
+
+        var mapData = BuildStarMapData(anchor, route, targetCoord, observerContext, useObserverOrientationRequested);
+        if (mapData is not null)
+        {
+            ShowStarMap?.Invoke(mapData);
+            return;
+        }
 
         var lines = new List<string>
         {
@@ -245,6 +262,131 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
         ResultText = string.Join("\n", lines);
         HasResult = true;
+    }
+
+    private StarMapData? BuildStarMapData(
+        AnchorResult anchor,
+        HopRoute route,
+        EquatorialCoordinate targetCoord,
+        ObserverOrientationContext? observerContext,
+        bool useObserverOrientationRequested)
+    {
+        if (_selectedTarget is null) return null;
+
+        // Resolve asterism stars by HIP ID
+        var asterismStars = new List<StarMapPoint>();
+        var hipToIndex = new Dictionary<int, int>();
+
+        foreach (var hipId in anchor.Asterism.StarIds)
+        {
+            var star = _catalog.FindStarByHipparcosId(hipId);
+            if (star is null) continue;
+
+            hipToIndex[hipId] = asterismStars.Count;
+            asterismStars.Add(new StarMapPoint(
+                star.RightAscensionHours,
+                star.DeclinationDeg,
+                star.VisualMagnitude,
+                star.DisplayName));
+        }
+
+        // Build segment index pairs
+        var segments = new List<(int From, int To)>();
+        foreach (var seg in anchor.Asterism.Segments)
+        {
+            if (seg.Length >= 2
+                && hipToIndex.TryGetValue(seg[0], out var fromIdx)
+                && hipToIndex.TryGetValue(seg[1], out var toIdx))
+            {
+                segments.Add((fromIdx, toIdx));
+            }
+        }
+
+        // Build hop steps list: anchor star first, then each hop ToStar
+        var hopSteps = new List<StarMapPoint>
+        {
+            new(anchor.AnchorStar.RightAscensionHours,
+                anchor.AnchorStar.DeclinationDeg,
+                anchor.AnchorStar.VisualMagnitude,
+                anchor.AnchorStar.DisplayName)
+        };
+
+        foreach (var step in route.Steps)
+        {
+            hopSteps.Add(new StarMapPoint(
+                step.ToStar.RightAscensionHours,
+                step.ToStar.DeclinationDeg,
+                step.ToStar.VisualMagnitude,
+                step.ToStar.DisplayName));
+        }
+
+        // Collect a richer set of nearby context stars so the plotted field better resembles the real sky.
+        var keyCoordinates = asterismStars
+            .Concat(hopSteps)
+            .Append(new StarMapPoint(targetCoord.RaHours, targetCoord.DecDegrees, _selectedTarget.VisualMagnitude ?? 10.0, null))
+            .Select(point => new EquatorialCoordinate(point.RaHours, point.DecDeg))
+            .ToList();
+
+        var maxKeySeparation = keyCoordinates
+            .Select(coord => SphericalGeometry.AngularSeparationDegrees(targetCoord, coord))
+            .DefaultIfEmpty(0.0)
+            .Max();
+
+        var contextFieldRadius = Math.Clamp(maxKeySeparation + 6.0, 10.0, 28.0);
+        var extendedBrightFieldRadius = Math.Clamp(contextFieldRadius * 1.25, 12.0, 36.0);
+
+        // Set of HIP IDs already drawn as asterism/hop stars.
+        var drawnHipIds = new HashSet<int>(anchor.Asterism.StarIds);
+        foreach (var step in route.Steps)
+        {
+            if (step.ToStar.HipparcosId.HasValue)
+                drawnHipIds.Add(step.ToStar.HipparcosId.Value);
+            if (step.FromStar.HipparcosId.HasValue)
+                drawnHipIds.Add(step.FromStar.HipparcosId.Value);
+        }
+
+        var backgroundStars = _catalog.GetStars()
+            .Where(s => !s.HipparcosId.HasValue || !drawnHipIds.Contains(s.HipparcosId.Value))
+            .Select(s =>
+            {
+                var coord = new EquatorialCoordinate(s.RightAscensionHours, s.DeclinationDeg);
+                var distanceFromTarget = SphericalGeometry.AngularSeparationDegrees(targetCoord, coord);
+                return new { Star = s, DistanceFromTarget = distanceFromTarget };
+            })
+            .Where(x =>
+                (x.Star.VisualMagnitude <= 6.2 && x.DistanceFromTarget <= contextFieldRadius) ||
+                (x.Star.VisualMagnitude <= 3.2 && x.DistanceFromTarget <= extendedBrightFieldRadius))
+            .OrderBy(x => x.Star.VisualMagnitude)
+            .ThenBy(x => x.DistanceFromTarget)
+            .Take(140)
+            .Select(x => new StarMapPoint(x.Star.RightAscensionHours, x.Star.DeclinationDeg, x.Star.VisualMagnitude, null))
+            .ToList();
+
+        var orientationSummary = observerContext is not null
+            ? $"Sky-oriented • {FormatLatitude(observerContext.LatitudeDegrees)}, {FormatLongitude(observerContext.LongitudeDegrees)} • {observerContext.ObservationTime.LocalDateTime:HH:mm}"
+            : useObserverOrientationRequested
+                ? "North-up chart • location unavailable"
+                : "North-up chart";
+
+        return new StarMapData
+        {
+            Title = $"Star Hop: {_selectedTarget.DisplayName}",
+            Target = new StarMapPoint(
+                _selectedTarget.RightAscensionHours,
+                _selectedTarget.DeclinationDeg,
+                _selectedTarget.VisualMagnitude ?? 10.0,
+                _selectedTarget.DisplayName),
+            AsterismName = anchor.Asterism.DisplayName,
+            AsterismStars = asterismStars,
+            AsterismSegments = segments,
+            HopSteps = hopSteps,
+            BackgroundStars = backgroundStars,
+            UseObserverOrientation = observerContext is not null,
+            ObserverLatitudeDeg = observerContext?.LatitudeDegrees,
+            ObserverLongitudeDeg = observerContext?.LongitudeDegrees,
+            ObservationTime = observerContext?.ObservationTime ?? DateTimeOffset.Now,
+            OrientationSummary = orientationSummary
+        };
     }
 
     private void ShowDeltas()
@@ -289,6 +431,12 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
     private static string FormatDelta(double degrees) =>
         degrees >= 0 ? $"+{degrees:F4}°" : $"{degrees:F4}°";
+
+    private static string FormatLatitude(double latitudeDegrees) =>
+        $"{Math.Abs(latitudeDegrees):F1}°{(latitudeDegrees >= 0 ? "N" : "S")}";
+
+    private static string FormatLongitude(double longitudeDegrees) =>
+        $"{Math.Abs(longitudeDegrees):F1}°{(longitudeDegrees >= 0 ? "E" : "W")}";
 
     /// <summary>
     /// Returns search variants for a query, including Messier number normalization.

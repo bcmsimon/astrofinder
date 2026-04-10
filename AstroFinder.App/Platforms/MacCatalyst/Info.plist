@@ -25,5 +25,7 @@
 	</array>
 	<key>XSAppIconAssets</key>
 	<string>Assets.xcassets/appicon.appiconset</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>AstroFinder uses your location to orient star hop maps to match the sky you see.</string>
 </dict>
 </plist>

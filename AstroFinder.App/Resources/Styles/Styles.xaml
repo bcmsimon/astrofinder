@@ -9,7 +9,7 @@
     </Style>
 
     <Style TargetType="Label">
-        <Setter Property="TextColor" Value="{DynamicResource ColorOnSurface}" />
+        <Setter Property="TextColor" Value="{DynamicResource ColorTextPrimary}" />
         <Setter Property="FontSize" Value="14" />
     </Style>
 
@@ -19,9 +19,9 @@
 
     <Style TargetType="Shell" ApplyToDerivedTypes="True">
         <Setter Property="Shell.BackgroundColor" Value="{DynamicResource ColorSurface}" />
-        <Setter Property="Shell.ForegroundColor" Value="{DynamicResource ColorOnSurface}" />
-        <Setter Property="Shell.TitleColor" Value="{DynamicResource ColorOnSurface}" />
-        <Setter Property="Shell.UnselectedColor" Value="{DynamicResource ColorOnSurfaceVariant}" />
+        <Setter Property="Shell.ForegroundColor" Value="{DynamicResource ColorTextPrimary}" />
+        <Setter Property="Shell.TitleColor" Value="{DynamicResource ColorTextPrimary}" />
+        <Setter Property="Shell.UnselectedColor" Value="{DynamicResource ColorTextSecondary}" />
     </Style>
 
 </ResourceDictionary>

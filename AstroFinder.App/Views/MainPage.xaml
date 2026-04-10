@@ -6,11 +6,11 @@
              x:Name="Root"
              Title="AstroFinder">
 
-    <Grid RowDefinitions="Auto,*" BackgroundColor="{DynamicResource ColorSurface}">
+    <Grid RowDefinitions="Auto,*" BackgroundColor="{DynamicResource ColorBackground}">
 
         <!-- Header -->
         <Grid Grid.Row="0" Padding="16,12" ColumnDefinitions="Auto,*,Auto"
-              BackgroundColor="{DynamicResource ColorSurfaceAlt}">
+              BackgroundColor="{DynamicResource ColorSurface}">
 
             <Label Grid.Column="0"
                    Text="AstroFinder"
@@ -20,8 +20,8 @@
                    TextColor="{DynamicResource ColorPrimary}" />
 
             <ui:AppIconButton Grid.Column="2"
-                              IconGlyph="&#x2699;"
-                              Variant="Surface"
+                              IconGlyph="⚙"
+                              Variant="Outlined"
                               Size="40"
                               Command="{Binding Source={x:Reference Root}, Path=OpenSettingsCommand}" />
         </Grid>
@@ -42,12 +42,12 @@
                         HorizontalOptions="Start">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding SelectedTargetText}"
-                               TextColor="{DynamicResource ColorOnPrimary}"
+                               TextColor="{DynamicResource ColorTextInverse}"
                                FontSize="14"
                                VerticalTextAlignment="Center" />
                         <Label Grid.Column="1"
                                Text="✕"
-                               TextColor="{DynamicResource ColorOnPrimary}"
+                               TextColor="{DynamicResource ColorTextInverse}"
                                FontSize="14"
                                VerticalTextAlignment="Center">
                             <Label.GestureRecognizers>
@@ -58,15 +58,18 @@
                 </Border>
 
                 <!-- Target search -->
-                <SearchBar x:Name="TargetSearchBar"
-                           IsVisible="{Binding HasSelectedTarget, Converter={StaticResource InvertBool}}"
+                <Border IsVisible="{Binding HasSelectedTarget, Converter={StaticResource InvertBool}}"
+                        Style="{DynamicResource CardBorder}"
+                        Padding="12,0">
+                    <Entry x:Name="TargetSearchBar"
                            Placeholder="Search targets (M31, NGC 7000, Orion...)"
                            Text="{Binding TargetSearchText, Mode=TwoWay}"
                            TextChanged="OnTargetSearchTextChanged"
-                           BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                           TextColor="{DynamicResource ColorOnSurface}"
-                           PlaceholderColor="{DynamicResource ColorOnSurfaceVariant}"
-                           CancelButtonColor="{DynamicResource ColorPrimary}" />
+                           PlaceholderColor="{DynamicResource ColorTextMuted}"
+                           ClearButtonVisibility="WhileEditing"
+                           ReturnType="Search"
+                           VerticalOptions="Center" />
+                </Border>
 
                 <!-- Target results -->
                 <CollectionView IsVisible="{Binding IsTargetListVisible}"
@@ -79,17 +82,17 @@
                     </CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                                    Stroke="{DynamicResource ColorOutline}"
+                            <Border BackgroundColor="{DynamicResource ColorSurface}"
+                                    Stroke="{DynamicResource ColorBorder}"
                                     StrokeThickness="1"
                                     Padding="12,10"
                                     StrokeShape="RoundRectangle 8">
                                 <VerticalStackLayout Spacing="2">
                                     <Label Text="{Binding DisplayName}"
-                                           TextColor="{DynamicResource ColorOnSurface}"
+                                           TextColor="{DynamicResource ColorTextPrimary}"
                                            FontSize="14" />
                                     <Label Text="{Binding Category}"
-                                           TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                                           TextColor="{DynamicResource ColorTextSecondary}"
                                            FontSize="11" />
                                 </VerticalStackLayout>
                             </Border>
@@ -109,12 +112,12 @@
                         HorizontalOptions="Start">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding SelectedStarText}"
-                               TextColor="{DynamicResource ColorOnSecondary}"
+                               TextColor="{DynamicResource ColorTextInverse}"
                                FontSize="14"
                                VerticalTextAlignment="Center" />
                         <Label Grid.Column="1"
                                Text="✕"
-                               TextColor="{DynamicResource ColorOnSecondary}"
+                               TextColor="{DynamicResource ColorTextInverse}"
                                FontSize="14"
                                VerticalTextAlignment="Center">
                             <Label.GestureRecognizers>
@@ -125,15 +128,18 @@
                 </Border>
 
                 <!-- Star search -->
-                <SearchBar x:Name="StarSearchBar"
-                           IsVisible="{Binding HasSelectedStar, Converter={StaticResource InvertBool}}"
+                <Border IsVisible="{Binding HasSelectedStar, Converter={StaticResource InvertBool}}"
+                        Style="{DynamicResource CardBorder}"
+                        Padding="12,0">
+                    <Entry x:Name="StarSearchBar"
                            Placeholder="Search reference stars (Vega, Polaris, Sirius...)"
                            Text="{Binding StarSearchText, Mode=TwoWay}"
                            TextChanged="OnStarSearchTextChanged"
-                           BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                           TextColor="{DynamicResource ColorOnSurface}"
-                           PlaceholderColor="{DynamicResource ColorOnSurfaceVariant}"
-                           CancelButtonColor="{DynamicResource ColorPrimary}" />
+                           PlaceholderColor="{DynamicResource ColorTextMuted}"
+                           ClearButtonVisibility="WhileEditing"
+                           ReturnType="Search"
+                           VerticalOptions="Center" />
+                </Border>
 
                 <!-- Star results -->
                 <CollectionView IsVisible="{Binding IsStarListVisible}"
@@ -146,18 +152,18 @@
                     </CollectionView.ItemsLayout>
                     <CollectionView.ItemTemplate>
                         <DataTemplate>
-                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                                    Stroke="{DynamicResource ColorOutline}"
+                            <Border BackgroundColor="{DynamicResource ColorSurface}"
+                                    Stroke="{DynamicResource ColorBorder}"
                                     StrokeThickness="1"
                                     Padding="12,10"
                                     StrokeShape="RoundRectangle 8">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <Label Text="{Binding DisplayName}"
-                                           TextColor="{DynamicResource ColorOnSurface}"
+                                           TextColor="{DynamicResource ColorTextPrimary}"
                                            FontSize="14" />
                                     <Label Grid.Column="1"
                                            Text="{Binding VisualMagnitude, StringFormat='mag {0:F1}'}"
-                                           TextColor="{DynamicResource ColorOnSurfaceVariant}"
+                                           TextColor="{DynamicResource ColorTextSecondary}"
                                            FontSize="11"
                                            VerticalTextAlignment="Center" />
                                 </Grid>
@@ -181,14 +187,14 @@
 
                 <!-- Results -->
                 <Border IsVisible="{Binding HasResult}"
-                        BackgroundColor="{DynamicResource ColorSurfaceAlt}"
-                        Stroke="{DynamicResource ColorOutline}"
+                        BackgroundColor="{DynamicResource ColorSurface}"
+                        Stroke="{DynamicResource ColorBorder}"
                         StrokeThickness="1"
                         Padding="16"
                         StrokeShape="RoundRectangle 12"
                         Margin="0,8,0,16">
                     <Label Text="{Binding ResultText}"
-                           TextColor="{DynamicResource ColorOnSurface}"
+                           TextColor="{DynamicResource ColorTextPrimary}"
                            FontSize="13"
                            FontFamily="Consolas"
                            LineBreakMode="WordWrap" />

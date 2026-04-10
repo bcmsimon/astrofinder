@@ -23,6 +23,11 @@ public partial class MainPage : ContentPage
         _settingsPageService = settingsPageService;
         BindingContext = _vm;
 
+        _vm.ShowStarMap += async data =>
+        {
+            await Navigation.PushModalAsync(new StarMapPage(data));
+        };
+
         OpenSettingsCommand = new Command(async () =>
         {
             var settingsPage = _settingsPageService.CreateSettingsPage("Settings");
