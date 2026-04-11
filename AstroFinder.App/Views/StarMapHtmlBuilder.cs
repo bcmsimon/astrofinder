@@ -37,11 +37,13 @@ internal static class StarMapHtmlBuilder
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=1400, initial-scale=1.0, minimum-scale=1.0, maximum-scale=8.0, user-scalable=yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=8.0, user-scalable=yes" />
   <style>
     html, body {
       margin: 0;
       padding: 0;
+      width: 100%;
+      min-height: 100%;
       background: {{ToCss(pageBackground)}};
       overflow: auto;
       touch-action: pan-x pan-y pinch-zoom;
@@ -49,16 +51,18 @@ internal static class StarMapHtmlBuilder
     }
 
     .wrap {
-      width: {{CanvasWidth}}px;
-      min-height: {{CanvasHeight}}px;
+      width: 100%;
+      max-width: {{CanvasWidth}}px;
       margin: 0 auto;
       background: {{ToCss(pageBackground)}};
     }
 
     svg {
       display: block;
-      width: {{CanvasWidth}}px;
-      height: {{CanvasHeight}}px;
+      width: 100%;
+      max-width: {{CanvasWidth}}px;
+      height: auto;
+      aspect-ratio: 1 / 1;
       background: {{ToCss(pageBackground)}};
     }
   </style>

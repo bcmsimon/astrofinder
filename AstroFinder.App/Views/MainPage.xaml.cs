@@ -17,22 +17,40 @@ public partial class MainPage : ContentPage
         AstroFinderSettingsModuleBootstrapper settingsBootstrapper,
         ISharedSettingsPageService settingsPageService)
     {
-        InitializeComponent();
         _vm = viewModel;
         _settingsBootstrapper = settingsBootstrapper;
         _settingsPageService = settingsPageService;
+
+        // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
+        OpenSettingsCommand = new Command(async () => await OpenSettingsAsync());
+
+        InitializeComponent();
         BindingContext = _vm;
 
         _vm.ShowStarMap += async data =>
         {
             await Navigation.PushModalAsync(new StarMapPage(data));
         };
+    }
 
-        OpenSettingsCommand = new Command(async () =>
+    private async Task OpenSettingsAsync()
+    {
+        if (Shell.Current is null)
         {
+            return;
+        }
+
+        try
+        {
+            _settingsBootstrapper.EnsureRegistered();
             var settingsPage = _settingsPageService.CreateSettingsPage("Settings");
-            await Navigation.PushAsync(settingsPage);
-        });
+            await Shell.Current.Navigation.PushAsync(settingsPage);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AstroFinder] Failed to open settings: {ex}");
+            await DisplayAlert("Settings", "Could not open the settings page.", "OK");
+        }
     }
 
     public ICommand OpenSettingsCommand { get; }
@@ -47,11 +65,43 @@ public partial class MainPage : ContentPage
     private void OnTargetSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
         _vm.TargetSearchText = e.NewTextValue ?? string.Empty;
+        _vm.BeginTargetSearch();
+        ScrollTargetResultsToTop();
     }
 
     private void OnStarSearchTextChanged(object? sender, TextChangedEventArgs e)
     {
         _vm.StarSearchText = e.NewTextValue ?? string.Empty;
+        _vm.BeginStarSearch();
+        ScrollStarResultsToTop();
+    }
+
+    private void OnTargetSearchFocused(object? sender, FocusEventArgs e)
+    {
+        _vm.BeginTargetSearch();
+        ScrollTargetResultsToTop();
+    }
+
+    private void OnTargetSearchUnfocused(object? sender, FocusEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_vm.TargetSearchText))
+        {
+            _vm.EndTargetSearch();
+        }
+    }
+
+    private void OnStarSearchFocused(object? sender, FocusEventArgs e)
+    {
+        _vm.BeginStarSearch();
+        ScrollStarResultsToTop();
+    }
+
+    private void OnStarSearchUnfocused(object? sender, FocusEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_vm.StarSearchText))
+        {
+            _vm.EndStarSearch();
+        }
     }
 
     private void OnTargetSelected(object? sender, SelectionChangedEventArgs e)
@@ -68,5 +118,47 @@ public partial class MainPage : ContentPage
         {
             _vm.SelectStar(star);
         }
+    }
+
+    private void OnTargetResultTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is CatalogTarget target)
+        {
+            _vm.SelectTarget(target);
+            TargetSearchBar.Unfocus();
+        }
+    }
+
+    private void OnStarResultTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is CatalogStar star)
+        {
+            _vm.SelectStar(star);
+            StarSearchBar.Unfocus();
+        }
+    }
+
+    private void ScrollTargetResultsToTop()
+    {
+        Dispatcher.Dispatch(() =>
+        {
+            var first = _vm.FilteredTargets.FirstOrDefault();
+            if (first is not null)
+            {
+                TargetResultsList.ScrollTo(first, position: ScrollToPosition.Start, animate: false);
+            }
+        });
+    }
+
+    private void ScrollStarResultsToTop()
+    {
+        Dispatcher.Dispatch(() =>
+        {
+            var first = _vm.FilteredStars.FirstOrDefault();
+            if (first is not null)
+            {
+                StarResultsList.ScrollTo(first, position: ScrollToPosition.Start, animate: false);
+            }
+        });
     }
 }

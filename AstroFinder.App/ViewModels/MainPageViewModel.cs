@@ -9,6 +9,7 @@ using AstroFinder.Engine.Hops;
 using AstroFinder.Engine.Primitives;
 using AstroFinder.App.Views;
 
+
 namespace AstroFinder.App.ViewModels;
 
 public sealed class MainPageViewModel : INotifyPropertyChanged
@@ -28,6 +29,9 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private string _resultText = string.Empty;
     private bool _hasResult;
     private bool _isLoaded;
+    private bool _isTargetSearchActive;
+    private bool _isStarSearchActive;
+    private string _lastSuggestedStarText = string.Empty;
 
     public MainPageViewModel(AppCatalogProvider catalog, ObserverOrientationService observerOrientationService)
     {
@@ -119,23 +123,30 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         private set { _hasResult = value; OnPropertyChanged(); }
     }
 
-    public bool IsTargetListVisible => !HasSelectedTarget && TargetSearchText.Length > 0 && FilteredTargets.Count > 0;
-    public bool IsStarListVisible => !HasSelectedStar && StarSearchText.Length > 0 && FilteredStars.Count > 0;
+    public bool IsTargetListVisible => !HasSelectedTarget && (_isTargetSearchActive || TargetSearchText.Length > 0) && FilteredTargets.Count > 0;
+    public bool IsStarListVisible => !HasSelectedStar && (_isStarSearchActive || StarSearchText.Length > 0) && FilteredStars.Count > 0;
 
     public IReadOnlyList<CatalogTarget> FilteredTargets
     {
         get
         {
             if (string.IsNullOrWhiteSpace(_targetSearchText))
-                return [];
+            {
+                return _allTargets
+                    .OrderBy(t => t.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .Take(25)
+                    .ToList();
+            }
 
             var q = _targetSearchText.Trim();
             var queries = GetSearchVariants(q);
             return _allTargets
-                .Where(t => queries.Any(v => t.DisplayName.Contains(v, StringComparison.OrdinalIgnoreCase)
-                         || t.Id.Contains(v, StringComparison.OrdinalIgnoreCase)
-                         || t.Aliases.Any(a => a.Contains(v, StringComparison.OrdinalIgnoreCase))))
-                .Take(20)
+                .Select(target => new { Target = target, Rank = GetTargetMatchRank(target, queries) })
+                .Where(x => x.Rank < int.MaxValue)
+                .OrderBy(x => x.Rank)
+                .ThenBy(x => x.Target.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(25)
+                .Select(x => x.Target)
                 .ToList();
         }
     }
@@ -145,14 +156,22 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         get
         {
             if (string.IsNullOrWhiteSpace(_starSearchText))
-                return [];
+            {
+                return _allStars
+                    .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                    .Take(25)
+                    .ToList();
+            }
 
             var q = _starSearchText.Trim();
             return _allStars
-                .Where(s => s.DisplayName.Contains(q, StringComparison.OrdinalIgnoreCase)
-                         || s.Id.Contains(q, StringComparison.OrdinalIgnoreCase)
-                         || s.Aliases.Any(a => a.Contains(q, StringComparison.OrdinalIgnoreCase)))
-                .Take(20)
+                .Select(star => new { Star = star, Rank = GetStarMatchRank(star, q) })
+                .Where(x => x.Rank < int.MaxValue)
+                .OrderBy(x => x.Rank)
+                .ThenBy(x => x.Star.VisualMagnitude)
+                .ThenBy(x => x.Star.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(25)
+                .Select(x => x.Star)
                 .ToList();
         }
     }
@@ -172,6 +191,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             _allTargets = _catalog.GetTargets();
             _allStars = _catalog.GetStars();
             _isLoaded = true;
+
+            if (_selectedTarget is not null && _selectedStar is null)
+            {
+                ApplySuggestedStarSearchText(_selectedTarget);
+            }
         }
         catch (Exception ex)
         {
@@ -181,24 +205,141 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         }
     }
 
+    // Only used as a fallback suggestion when no nearby bright star is found.
+    private static readonly string[] DefaultStarCandidates =
+    [
+        "Polaris", "Vega", "Arcturus", "Capella", "Sirius", "Rigel", "Procyon", "Betelgeuse"
+    ];
+
+    private void ApplySuggestedStarSearchText(CatalogTarget target)
+    {
+        var suggestedStar = FindSuggestedStar(target);
+        if (suggestedStar is null)
+        {
+            _lastSuggestedStarText = string.Empty;
+            return;
+        }
+
+        var shouldOverwriteSearchText = string.IsNullOrWhiteSpace(StarSearchText)
+            || string.Equals(StarSearchText, _lastSuggestedStarText, StringComparison.OrdinalIgnoreCase);
+
+        _lastSuggestedStarText = suggestedStar.DisplayName;
+
+        if (shouldOverwriteSearchText)
+        {
+            StarSearchText = suggestedStar.DisplayName;
+            BeginStarSearch();
+        }
+    }
+
+    private CatalogStar? FindSuggestedStar(CatalogTarget target)
+    {
+        const double MaxSeparationDeg = 25.0;
+        const double MaxMagnitude = 3.0;
+
+        var targetCoord = new EquatorialCoordinate(target.RightAscensionHours, target.DeclinationDeg);
+
+        var nearbyBrightStar = _allStars
+            .Where(s => s.VisualMagnitude <= MaxMagnitude)
+            .Select(s => new
+            {
+                Star = s,
+                Sep = SphericalGeometry.AngularSeparationDegrees(
+                    new EquatorialCoordinate(s.RightAscensionHours, s.DeclinationDeg),
+                    targetCoord)
+            })
+            .Where(x => x.Sep <= MaxSeparationDeg)
+            .OrderBy(x => x.Sep)
+            .ThenBy(x => x.Star.VisualMagnitude)
+            .Select(x => x.Star)
+            .FirstOrDefault();
+
+        if (nearbyBrightStar is not null)
+        {
+            return nearbyBrightStar;
+        }
+
+        foreach (var candidate in DefaultStarCandidates)
+        {
+            var match = _allStars.FirstOrDefault(s =>
+                string.Equals(s.DisplayName, candidate, StringComparison.OrdinalIgnoreCase));
+
+            if (match is not null)
+            {
+                return match;
+            }
+        }
+
+        return null;
+    }
+
+    public void BeginTargetSearch()
+    {
+        if (_isTargetSearchActive)
+        {
+            return;
+        }
+
+        _isTargetSearchActive = true;
+        OnPropertyChanged(nameof(IsTargetListVisible));
+    }
+
+    public void BeginStarSearch()
+    {
+        if (_isStarSearchActive)
+        {
+            return;
+        }
+
+        _isStarSearchActive = true;
+        OnPropertyChanged(nameof(IsStarListVisible));
+    }
+
+    public void EndTargetSearch()
+    {
+        _isTargetSearchActive = false;
+        OnPropertyChanged(nameof(IsTargetListVisible));
+    }
+
+    public void EndStarSearch()
+    {
+        _isStarSearchActive = false;
+        OnPropertyChanged(nameof(IsStarListVisible));
+    }
+
     public void SelectTarget(CatalogTarget target)
     {
         SelectedTarget = target;
         TargetSearchText = string.Empty;
-        OnPropertyChanged(nameof(IsTargetListVisible));
+        EndTargetSearch();
+
+        if (_selectedStar is null)
+        {
+            ApplySuggestedStarSearchText(target);
+        }
     }
 
     public void SelectStar(CatalogStar star)
     {
         SelectedStar = star;
         StarSearchText = string.Empty;
-        OnPropertyChanged(nameof(IsStarListVisible));
+        _lastSuggestedStarText = string.Empty;
+        EndStarSearch();
     }
 
     private void ClearTarget()
     {
         SelectedTarget = null;
         TargetSearchText = string.Empty;
+        EndTargetSearch();
+
+        if (_selectedStar is null)
+        {
+            StarSearchText = string.Empty;
+            _lastSuggestedStarText = string.Empty;
+            EndStarSearch();
+        }
+
         HasResult = false;
         ResultText = string.Empty;
     }
@@ -206,7 +347,17 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private void ClearStar()
     {
         SelectedStar = null;
-        StarSearchText = string.Empty;
+
+        if (_selectedTarget is not null)
+        {
+            ApplySuggestedStarSearchText(_selectedTarget);
+        }
+        else
+        {
+            StarSearchText = string.Empty;
+            _lastSuggestedStarText = string.Empty;
+            EndStarSearch();
+        }
     }
 
     private async Task BuildStarHopMapAsync()
@@ -457,6 +608,72 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         }
 
         return [query];
+    }
+
+    private static int GetTargetMatchRank(CatalogTarget target, IReadOnlyList<string> queries)
+    {
+        var best = int.MaxValue;
+
+        foreach (var query in queries)
+        {
+            best = Math.Min(best, GetTextMatchRank(target.DisplayName, query, preferStartsWith: true));
+            best = Math.Min(best, GetTextMatchRank(target.Id, query));
+
+            foreach (var alias in target.Aliases)
+            {
+                best = Math.Min(best, GetTextMatchRank(alias, query));
+            }
+        }
+
+        return best;
+    }
+
+    private static int GetStarMatchRank(CatalogStar star, string query)
+    {
+        var best = GetTextMatchRank(star.DisplayName, query, preferStartsWith: true);
+        best = Math.Min(best, GetTextMatchRank(star.Id, query));
+
+        foreach (var alias in star.Aliases)
+        {
+            best = Math.Min(best, GetTextMatchRank(alias, query));
+        }
+
+        return best;
+    }
+
+    private static int GetTextMatchRank(string? text, string query, bool preferStartsWith = false)
+    {
+        if (string.IsNullOrWhiteSpace(text) || string.IsNullOrWhiteSpace(query))
+        {
+            return int.MaxValue;
+        }
+
+        if (string.Equals(text, query, StringComparison.OrdinalIgnoreCase))
+        {
+            return 0;
+        }
+
+        if (preferStartsWith && text.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return 1;
+        }
+
+        if (text.StartsWith(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return 2;
+        }
+
+        if (preferStartsWith && text.Contains($" {query}", StringComparison.OrdinalIgnoreCase))
+        {
+            return 3;
+        }
+
+        if (text.Contains(query, StringComparison.OrdinalIgnoreCase))
+        {
+            return 4;
+        }
+
+        return int.MaxValue;
     }
 
     private void OnPropertyChanged([CallerMemberName] string? name = null)

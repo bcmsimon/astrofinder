@@ -4,7 +4,8 @@
              xmlns:ui="clr-namespace:AstroApps.Maui.UIKit.Controls;assembly=AstroApps.Maui.UIKit"
              x:Class="AstroFinder.App.Views.MainPage"
              x:Name="Root"
-             Title="AstroFinder">
+             Title="AstroFinder"
+             Shell.NavBarIsVisible="False">
 
     <Grid RowDefinitions="Auto,*" BackgroundColor="{DynamicResource ColorBackground}">
 
@@ -20,9 +21,10 @@
                    TextColor="{DynamicResource ColorPrimary}" />
 
             <ui:AppIconButton Grid.Column="2"
-                              IconGlyph="⚙"
-                              Variant="Outlined"
-                              Size="40"
+                              IconGlyph="&#x2699;"
+                              Variant="Primary"
+                              Size="44"
+                              SemanticProperties.Description="Open settings"
                               Command="{Binding Source={x:Reference Root}, Path=OpenSettingsCommand}" />
         </Grid>
 
@@ -35,10 +37,11 @@
 
                 <!-- Selected target chip -->
                 <Border IsVisible="{Binding HasSelectedTarget}"
-                        BackgroundColor="{DynamicResource ColorPrimary}"
-                        Stroke="Transparent"
-                        StrokeShape="RoundRectangle 8"
-                        Padding="12,8"
+                        Background="{DynamicResource ColorPrimary}"
+                        Stroke="{DynamicResource ColorPrimary}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 10"
+                        Padding="14,10"
                         HorizontalOptions="Start">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding SelectedTargetText}"
@@ -61,54 +64,78 @@
                 <Border IsVisible="{Binding HasSelectedTarget, Converter={StaticResource InvertBool}}"
                         Style="{DynamicResource CardBorder}"
                         Padding="12,0">
-                    <Entry x:Name="TargetSearchBar"
-                           Placeholder="Search targets (M31, NGC 7000, Orion...)"
-                           Text="{Binding TargetSearchText, Mode=TwoWay}"
-                           TextChanged="OnTargetSearchTextChanged"
-                           PlaceholderColor="{DynamicResource ColorTextMuted}"
-                           ClearButtonVisibility="WhileEditing"
-                           ReturnType="Search"
-                           VerticalOptions="Center" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Label Text="⌕"
+                               TextColor="{DynamicResource ColorTextMuted}"
+                               VerticalTextAlignment="Center" />
+                        <Entry x:Name="TargetSearchBar"
+                               Grid.Column="1"
+                               Placeholder="Search targets (M31, NGC 7000, Orion...)"
+                               Text="{Binding TargetSearchText, Mode=TwoWay}"
+                               TextChanged="OnTargetSearchTextChanged"
+                               Focused="OnTargetSearchFocused"
+                               Unfocused="OnTargetSearchUnfocused"
+                               TextColor="{DynamicResource ColorTextPrimary}"
+                               BackgroundColor="Transparent"
+                               PlaceholderColor="{DynamicResource ColorTextMuted}"
+                               ClearButtonVisibility="WhileEditing"
+                               ReturnType="Search"
+                               VerticalOptions="Center" />
+                        <Label Grid.Column="2"
+                               Text="▾"
+                               TextColor="{DynamicResource ColorTextMuted}"
+                               VerticalTextAlignment="Center" />
+                    </Grid>
                 </Border>
 
                 <!-- Target results -->
-                <CollectionView IsVisible="{Binding IsTargetListVisible}"
-                                ItemsSource="{Binding FilteredTargets}"
-                                SelectionMode="Single"
-                                SelectionChanged="OnTargetSelected"
-                                MaximumHeightRequest="200">
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
-                    </CollectionView.ItemsLayout>
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Border BackgroundColor="{DynamicResource ColorSurface}"
-                                    Stroke="{DynamicResource ColorBorder}"
-                                    StrokeThickness="1"
-                                    Padding="12,10"
-                                    StrokeShape="RoundRectangle 8">
-                                <VerticalStackLayout Spacing="2">
-                                    <Label Text="{Binding DisplayName}"
-                                           TextColor="{DynamicResource ColorTextPrimary}"
-                                           FontSize="14" />
-                                    <Label Text="{Binding Category}"
-                                           TextColor="{DynamicResource ColorTextSecondary}"
-                                           FontSize="11" />
-                                </VerticalStackLayout>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                <Border IsVisible="{Binding IsTargetListVisible}"
+                        Style="{DynamicResource CardBorder}"
+                        Padding="4"
+                        Margin="0,-6,0,0"
+                        BackgroundColor="{DynamicResource ColorSurfaceAlt}">
+                    <CollectionView x:Name="TargetResultsList"
+                                    ItemsSource="{Binding FilteredTargets}"
+                                    SelectionMode="None"
+                                    MaximumHeightRequest="220"
+                                    VerticalScrollBarVisibility="Always">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                                        Stroke="{DynamicResource ColorBorder}"
+                                        StrokeThickness="1"
+                                        Padding="12,10"
+                                        StrokeShape="RoundRectangle 8">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnTargetResultTapped" />
+                                    </Border.GestureRecognizers>
+                                    <VerticalStackLayout Spacing="2">
+                                        <Label Text="{Binding DisplayName}"
+                                               TextColor="{DynamicResource ColorTextPrimary}"
+                                               FontSize="14" />
+                                        <Label Text="{Binding Category}"
+                                               TextColor="{DynamicResource ColorTextSecondary}"
+                                               FontSize="11" />
+                                    </VerticalStackLayout>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Border>
 
                 <!-- Reference Star Section -->
                 <ui:SectionHeader Title="Reference Star" Margin="0,8,0,0" />
 
                 <!-- Selected star chip -->
                 <Border IsVisible="{Binding HasSelectedStar}"
-                        BackgroundColor="{DynamicResource ColorSecondary}"
-                        Stroke="Transparent"
-                        StrokeShape="RoundRectangle 8"
-                        Padding="12,8"
+                        Background="{DynamicResource ColorAccent}"
+                        Stroke="{DynamicResource ColorAccent}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 10"
+                        Padding="14,10"
                         HorizontalOptions="Start">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                         <Label Text="{Binding SelectedStarText}"
@@ -131,56 +158,79 @@
                 <Border IsVisible="{Binding HasSelectedStar, Converter={StaticResource InvertBool}}"
                         Style="{DynamicResource CardBorder}"
                         Padding="12,0">
-                    <Entry x:Name="StarSearchBar"
-                           Placeholder="Search reference stars (Vega, Polaris, Sirius...)"
-                           Text="{Binding StarSearchText, Mode=TwoWay}"
-                           TextChanged="OnStarSearchTextChanged"
-                           PlaceholderColor="{DynamicResource ColorTextMuted}"
-                           ClearButtonVisibility="WhileEditing"
-                           ReturnType="Search"
-                           VerticalOptions="Center" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <Label Text="⌕"
+                               TextColor="{DynamicResource ColorTextMuted}"
+                               VerticalTextAlignment="Center" />
+                        <Entry x:Name="StarSearchBar"
+                               Grid.Column="1"
+                               Placeholder="Search reference stars (Vega, Polaris, Sirius...)"
+                               Text="{Binding StarSearchText, Mode=TwoWay}"
+                               TextChanged="OnStarSearchTextChanged"
+                               Focused="OnStarSearchFocused"
+                               Unfocused="OnStarSearchUnfocused"
+                               TextColor="{DynamicResource ColorTextPrimary}"
+                               BackgroundColor="Transparent"
+                               PlaceholderColor="{DynamicResource ColorTextMuted}"
+                               ClearButtonVisibility="WhileEditing"
+                               ReturnType="Search"
+                               VerticalOptions="Center" />
+                        <Label Grid.Column="2"
+                               Text="▾"
+                               TextColor="{DynamicResource ColorTextMuted}"
+                               VerticalTextAlignment="Center" />
+                    </Grid>
                 </Border>
 
                 <!-- Star results -->
-                <CollectionView IsVisible="{Binding IsStarListVisible}"
-                                ItemsSource="{Binding FilteredStars}"
-                                SelectionMode="Single"
-                                SelectionChanged="OnStarSelected"
-                                MaximumHeightRequest="200">
-                    <CollectionView.ItemsLayout>
-                        <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
-                    </CollectionView.ItemsLayout>
-                    <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <Border BackgroundColor="{DynamicResource ColorSurface}"
-                                    Stroke="{DynamicResource ColorBorder}"
-                                    StrokeThickness="1"
-                                    Padding="12,10"
-                                    StrokeShape="RoundRectangle 8">
-                                <Grid ColumnDefinitions="*,Auto">
-                                    <Label Text="{Binding DisplayName}"
-                                           TextColor="{DynamicResource ColorTextPrimary}"
-                                           FontSize="14" />
-                                    <Label Grid.Column="1"
-                                           Text="{Binding VisualMagnitude, StringFormat='mag {0:F1}'}"
-                                           TextColor="{DynamicResource ColorTextSecondary}"
-                                           FontSize="11"
-                                           VerticalTextAlignment="Center" />
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </CollectionView.ItemTemplate>
-                </CollectionView>
+                <Border IsVisible="{Binding IsStarListVisible}"
+                        Style="{DynamicResource CardBorder}"
+                        Padding="4"
+                        Margin="0,-6,0,0"
+                        BackgroundColor="{DynamicResource ColorSurfaceAlt}">
+                    <CollectionView x:Name="StarResultsList"
+                                    ItemsSource="{Binding FilteredStars}"
+                                    SelectionMode="None"
+                                    MaximumHeightRequest="220"
+                                    VerticalScrollBarVisibility="Always">
+                        <CollectionView.ItemsLayout>
+                            <LinearItemsLayout Orientation="Vertical" ItemSpacing="4" />
+                        </CollectionView.ItemsLayout>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                                        Stroke="{DynamicResource ColorBorder}"
+                                        StrokeThickness="1"
+                                        Padding="12,10"
+                                        StrokeShape="RoundRectangle 8">
+                                    <Border.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnStarResultTapped" />
+                                    </Border.GestureRecognizers>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <Label Text="{Binding DisplayName}"
+                                               TextColor="{DynamicResource ColorTextPrimary}"
+                                               FontSize="14" />
+                                        <Label Grid.Column="1"
+                                               Text="{Binding VisualMagnitude, StringFormat='mag {0:F1}'}"
+                                               TextColor="{DynamicResource ColorTextSecondary}"
+                                               FontSize="11"
+                                               VerticalTextAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </Border>
 
                 <!-- Action Buttons -->
                 <Grid ColumnDefinitions="*,*" ColumnSpacing="12" Margin="0,16,0,0">
                     <ui:AppButton Grid.Column="0"
-                                  Text="Build Star Hop Map"
+                                  Text="Build Star Hop"
                                   Variant="Primary"
                                   Command="{Binding BuildMapCommand}" />
 
                     <ui:AppButton Grid.Column="1"
-                                  Text="Show RA/Dec Deltas"
+                                  Text="Show RA/Dec"
                                   Variant="Secondary"
                                   Command="{Binding ShowDeltasCommand}" />
                 </Grid>
