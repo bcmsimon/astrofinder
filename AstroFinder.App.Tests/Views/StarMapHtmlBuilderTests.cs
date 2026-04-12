@@ -41,6 +41,10 @@ public class StarMapHtmlBuilderTests
         [
             new StarMapPoint(5.45, -2.5, 4.8, null),
             new StarMapPoint(5.75, -4.4, 5.1, null)
+        ],
+        MapFillStars =
+        [
+            new StarMapPoint(5.48, -3.1, 6.8, null)
         ]
     };
 }

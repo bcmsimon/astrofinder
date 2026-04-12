@@ -1,11 +1,24 @@
+using AstroFinder.App.Services;
+
 namespace AstroFinder.App.Views;
 
 public partial class StarMapPage : ContentPage
 {
+    private readonly StarMapData _data;
     private readonly string _mapHtml;
+    private readonly IDeviceOrientationService _deviceOrientationService;
+    private readonly ObserverOrientationService _observerOrientationService;
+    private double _lastViewportSide;
 
-    public StarMapPage(StarMapData data)
+    public StarMapPage(
+        StarMapData data,
+        IDeviceOrientationService deviceOrientationService,
+        ObserverOrientationService observerOrientationService)
     {
+        _data = data;
+        _deviceOrientationService = deviceOrientationService;
+        _observerOrientationService = observerOrientationService;
+
         InitializeComponent();
 
         _mapHtml = StarMapHtmlBuilder.BuildHtml(data);
@@ -13,7 +26,11 @@ public partial class StarMapPage : ContentPage
         LoadMap();
 
         var hopCount = data.HopSteps.Count > 1 ? data.HopSteps.Count - 1 : 0;
-        SummaryLabel.Text = $"Target: {data.Target.Label}  •  Anchor: {data.AsterismName}" +
+        var referenceText = string.IsNullOrWhiteSpace(data.ReferenceLabel)
+            ? $"Anchor: {data.AsterismName}"
+            : $"Reference: {data.ReferenceLabel}  •  Pattern: {data.AsterismName}";
+
+        SummaryLabel.Text = $"Target: {data.Target.Label}  •  {referenceText}" +
                             (hopCount > 0 ? $"  •  {hopCount} hop{(hopCount != 1 ? "s" : "")}" : "  •  Direct") +
                             $"\n{data.OrientationSummary}  •  Native pinch zoom";
     }
@@ -21,7 +38,38 @@ public partial class StarMapPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
-        LoadMap();
+        // Do NOT reload the map on every appearance — the HTML is already set in
+        // the constructor and is static. Reloading causes a visible flicker each
+        // time the user returns from the AR modal.
+    }
+
+    protected override void OnSizeAllocated(double width, double height)
+    {
+        base.OnSizeAllocated(width, height);
+        UpdateMapViewportSize(width, height);
+    }
+
+    private void UpdateMapViewportSize(double width, double height)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        // Keep the map viewport square so the SVG fills it cleanly with no dead area.
+        // Clamp by available vertical space so header and summary remain visible.
+        var maxWidthSide = Math.Max(220.0, width - 32.0);
+        var maxHeightSide = Math.Max(220.0, height - 260.0);
+        var side = Math.Max(220.0, Math.Min(maxWidthSide, maxHeightSide));
+
+        if (Math.Abs(side - _lastViewportSide) < 0.5)
+        {
+            return;
+        }
+
+        _lastViewportSide = side;
+        MapViewport.HeightRequest = side;
+        MapWebView.HeightRequest = Math.Max(120.0, side - 16.0);
     }
 
     private void LoadMap()
@@ -50,6 +98,22 @@ public partial class StarMapPage : ContentPage
             }
         };
 #endif
+    }
+
+    private async void OnArViewClicked(object? sender, EventArgs e)
+    {
+        // Request camera permission at the point of use if it has not been granted.
+        var status = await Permissions.CheckStatusAsync<Permissions.Camera>();
+        if (status != PermissionStatus.Granted)
+        {
+            status = await Permissions.RequestAsync<Permissions.Camera>();
+        }
+
+        // Navigate regardless — the AR page gracefully uses a dark background
+        // when the camera is unavailable.
+        _ = status; // used above; explicit discard avoids warning
+        await Navigation.PushModalAsync(
+            new ArStarHopPage(_data, _deviceOrientationService, _observerOrientationService));
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)

@@ -31,4 +31,14 @@ public partial class SettingsPage : ContentPage
 
         await _viewModel.ApplyLocationToggleAsync(e.Value);
     }
+
+    private async void OnArCameraToggleChanged(object? sender, ToggledEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        await _viewModel.ApplyArCameraToggleAsync(e.Value);
+    }
 }

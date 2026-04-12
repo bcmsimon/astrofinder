@@ -150,10 +150,18 @@ public sealed class StarMapDrawable : IDrawable
         canvas.SaveState();
         canvas.ClipRectangle(usableRect);
 
+        foreach (var star in _data.MapFillStars)
+        {
+            var pt = ToCanvas(star.RaHours, star.DecDeg);
+            var r = StarRadius(star.Magnitude) * 1.1f;
+            canvas.FillColor = dimStar.WithAlpha(BackgroundStarAlpha(star.Magnitude) * 0.6f);
+            canvas.FillCircle(pt, r);
+        }
+
         foreach (var star in _data.BackgroundStars)
         {
             var pt = ToCanvas(star.RaHours, star.DecDeg);
-            var r = StarRadius(star.Magnitude) * 0.7f;
+            var r = StarRadius(star.Magnitude) * 1.4f;
             canvas.FillColor = dimStar.WithAlpha(BackgroundStarAlpha(star.Magnitude));
             canvas.FillCircle(pt, r);
         }

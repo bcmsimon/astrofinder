@@ -71,6 +71,101 @@ public class MainPageViewModelSearchTests
         Assert.Equal("Dubhe", vm.FilteredStars.First().DisplayName);
     }
 
+    [Fact]
+    public void SelectStar_ShowsNearbyEasyTargets_AndFiltersFarOnesOut()
+    {
+        var vm = CreateViewModel();
+
+        var dubhe = new CatalogStar
+        {
+            Id = "dubhe",
+            DisplayName = "Dubhe",
+            VisualMagnitude = 1.8,
+            RightAscensionHours = 11.062,
+            DeclinationDeg = 61.75
+        };
+
+        SetPrivateField(vm, "_allStars", new List<CatalogStar>
+        {
+            dubhe,
+            new() { Id = "merak", DisplayName = "Merak", VisualMagnitude = 2.3, RightAscensionHours = 11.031, DeclinationDeg = 56.38 },
+            new() { Id = "phecda", DisplayName = "Phecda", VisualMagnitude = 2.4, RightAscensionHours = 11.897, DeclinationDeg = 53.69 }
+        });
+
+        var m81 = new CatalogTarget
+        {
+            Id = "m81",
+            DisplayName = "Bode's Galaxy",
+            Category = ShootingTargetCategory.Galaxy,
+            RightAscensionHours = 9.926,
+            DeclinationDeg = 69.065
+        };
+
+        var m82 = new CatalogTarget
+        {
+            Id = "m82",
+            DisplayName = "Cigar Galaxy",
+            Category = ShootingTargetCategory.Galaxy,
+            RightAscensionHours = 9.928,
+            DeclinationDeg = 69.679
+        };
+
+        var m13 = new CatalogTarget
+        {
+            Id = "m13",
+            DisplayName = "Hercules Globular",
+            Category = ShootingTargetCategory.Cluster,
+            RightAscensionHours = 16.694,
+            DeclinationDeg = 36.467
+        };
+
+        SetPrivateField(vm, "_allTargets", new List<CatalogTarget> { m81, m82, m13 });
+
+        vm.SelectStar(dubhe);
+
+        Assert.True(vm.HasNearbyTargetSuggestions);
+        Assert.Contains(vm.NearbyTargetSuggestions, x => x.DisplayName == "Bode's Galaxy");
+        Assert.Contains(vm.NearbyTargetSuggestions, x => x.DisplayName == "Cigar Galaxy");
+        Assert.DoesNotContain(vm.NearbyTargetSuggestions, x => x.DisplayName == "Hercules Globular");
+        Assert.All(vm.NearbyTargetSuggestions, x => Assert.True(x.SeparationDegrees <= 24.0));
+    }
+
+    [Fact]
+    public void SelectTarget_RemovesCurrentTargetFromNearbySuggestions()
+    {
+        var vm = CreateViewModel();
+
+        var dubhe = new CatalogStar
+        {
+            Id = "dubhe",
+            DisplayName = "Dubhe",
+            VisualMagnitude = 1.8,
+            RightAscensionHours = 11.062,
+            DeclinationDeg = 61.75
+        };
+
+        var m81 = new CatalogTarget
+        {
+            Id = "m81",
+            DisplayName = "Bode's Galaxy",
+            Category = ShootingTargetCategory.Galaxy,
+            RightAscensionHours = 9.926,
+            DeclinationDeg = 69.065
+        };
+
+        SetPrivateField(vm, "_allStars", new List<CatalogStar> { dubhe });
+        SetPrivateField(vm, "_allTargets", new List<CatalogTarget>
+        {
+            m81,
+            new() { Id = "m82", DisplayName = "Cigar Galaxy", Category = ShootingTargetCategory.Galaxy, RightAscensionHours = 9.928, DeclinationDeg = 69.679 }
+        });
+
+        vm.SelectStar(dubhe);
+        vm.SelectTarget(m81);
+
+        Assert.DoesNotContain(vm.NearbyTargetSuggestions, x => x.Target.Id == "m81");
+    }
+
     private static MainPageViewModel CreateViewModel()
     {
         var starSerializer = new StarCatalogSerializer();

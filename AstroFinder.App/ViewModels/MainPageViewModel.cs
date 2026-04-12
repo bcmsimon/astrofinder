@@ -22,6 +22,18 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private IReadOnlyList<CatalogTarget> _allTargets = [];
     private IReadOnlyList<CatalogStar> _allStars = [];
 
+    // Pre-built caches — populated in LoadCatalogsAsync, never recomputed on binding ticks.
+    private IReadOnlyList<CatalogStar> _defaultStarList = [];
+    private IReadOnlyList<CatalogStar> _searchableStars = []; // named stars only — "HIP xxxxxx" entries excluded
+    private IReadOnlyList<CatalogTarget> _defaultTargetList = [];
+    private StarSpatialIndex? _starSpatialIndex;
+
+    // Cached results — re-evaluated only when search text changes.
+    private IReadOnlyList<CatalogStar> _cachedFilteredStars = [];
+    private IReadOnlyList<CatalogTarget> _cachedFilteredTargets = [];
+    private string _lastStarQuery = string.Empty;
+    private string _lastTargetQuery = string.Empty;
+
     private string _targetSearchText = string.Empty;
     private string _starSearchText = string.Empty;
     private CatalogTarget? _selectedTarget;
@@ -32,6 +44,8 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private bool _isTargetSearchActive;
     private bool _isStarSearchActive;
     private string _lastSuggestedStarText = string.Empty;
+    private IReadOnlyList<NearbyTargetSuggestion> _nearbyTargetSuggestions = [];
+    private const double NearbyTargetMaxSeparationDeg = 24.0;
 
     public MainPageViewModel(AppCatalogProvider catalog, ObserverOrientationService observerOrientationService)
     {
@@ -58,6 +72,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         {
             if (_targetSearchText == value) return;
             _targetSearchText = value;
+            RefreshFilteredTargets();
             OnPropertyChanged();
             OnPropertyChanged(nameof(FilteredTargets));
             OnPropertyChanged(nameof(IsTargetListVisible));
@@ -71,6 +86,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         {
             if (_starSearchText == value) return;
             _starSearchText = value;
+            RefreshFilteredStars();
             OnPropertyChanged();
             OnPropertyChanged(nameof(FilteredStars));
             OnPropertyChanged(nameof(IsStarListVisible));
@@ -87,6 +103,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedTargetText));
             OnPropertyChanged(nameof(HasSelectedTarget));
+            RefreshNearbyTargetSuggestions();
             ((Command)BuildMapCommand).ChangeCanExecute();
             ((Command)ShowDeltasCommand).ChangeCanExecute();
         }
@@ -102,6 +119,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedStarText));
             OnPropertyChanged(nameof(HasSelectedStar));
+            RefreshNearbyTargetSuggestions();
             ((Command)ShowDeltasCommand).ChangeCanExecute();
         }
     }
@@ -110,6 +128,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     public string SelectedStarText => _selectedStar?.DisplayName ?? string.Empty;
     public bool HasSelectedTarget => _selectedTarget is not null;
     public bool HasSelectedStar => _selectedStar is not null;
+    public IReadOnlyList<NearbyTargetSuggestion> NearbyTargetSuggestions => _nearbyTargetSuggestions;
+    public bool HasNearbyTargetSuggestions => _nearbyTargetSuggestions.Count > 0;
+    public string NearbyTargetHeaderText => _selectedStar is null
+        ? "Nearby targets"
+        : $"Nearby targets from {SelectedStarText}";
 
     public string ResultText
     {
@@ -126,21 +149,24 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     public bool IsTargetListVisible => !HasSelectedTarget && (_isTargetSearchActive || TargetSearchText.Length > 0) && FilteredTargets.Count > 0;
     public bool IsStarListVisible => !HasSelectedStar && (_isStarSearchActive || StarSearchText.Length > 0) && FilteredStars.Count > 0;
 
-    public IReadOnlyList<CatalogTarget> FilteredTargets
-    {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(_targetSearchText))
-            {
-                return _allTargets
-                    .OrderBy(t => t.DisplayName, StringComparer.OrdinalIgnoreCase)
-                    .Take(25)
-                    .ToList();
-            }
+    public IReadOnlyList<CatalogTarget> FilteredTargets => _cachedFilteredTargets;
 
-            var q = _targetSearchText.Trim();
+    public IReadOnlyList<CatalogStar> FilteredStars => _cachedFilteredStars;
+
+    private void RefreshFilteredTargets()
+    {
+        var q = _targetSearchText.Trim();
+        if (q == _lastTargetQuery) return;
+        _lastTargetQuery = q;
+
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            _cachedFilteredTargets = _defaultTargetList;
+        }
+        else
+        {
             var queries = GetSearchVariants(q);
-            return _allTargets
+            _cachedFilteredTargets = _allTargets
                 .Select(target => new { Target = target, Rank = GetTargetMatchRank(target, queries) })
                 .Where(x => x.Rank < int.MaxValue)
                 .OrderBy(x => x.Rank)
@@ -151,20 +177,20 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         }
     }
 
-    public IReadOnlyList<CatalogStar> FilteredStars
+    private void RefreshFilteredStars()
     {
-        get
-        {
-            if (string.IsNullOrWhiteSpace(_starSearchText))
-            {
-                return _allStars
-                    .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
-                    .Take(25)
-                    .ToList();
-            }
+        var q = _starSearchText.Trim();
+        if (q == _lastStarQuery) return;
+        _lastStarQuery = q;
 
-            var q = _starSearchText.Trim();
-            return _allStars
+        if (string.IsNullOrWhiteSpace(q))
+        {
+            _cachedFilteredStars = _defaultStarList;
+        }
+        else
+        {
+            // Search only named stars — "HIP xxxxxx" entries have no value in a pick list.
+            _cachedFilteredStars = _searchableStars
                 .Select(star => new { Star = star, Rank = GetStarMatchRank(star, q) })
                 .Where(x => x.Rank < int.MaxValue)
                 .OrderBy(x => x.Rank)
@@ -190,12 +216,38 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             await _catalog.LoadAsync();
             _allTargets = _catalog.GetTargets();
             _allStars = _catalog.GetStars();
+
+            // Pre-build caches so FilteredTargets/FilteredStars are never computed on binding ticks.
+            _defaultTargetList = _allTargets
+                .OrderBy(t => t.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(25)
+                .ToList();
+
+            _defaultStarList = _allStars
+                .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(25)
+                .ToList();
+
+            // Searchable set: exclude pure HIP-number entries (not useful in a pick list).
+            _searchableStars = _allStars
+                .Where(s => !s.DisplayName.StartsWith("HIP ", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            _starSpatialIndex = new StarSpatialIndex(_allStars);
+
+            _cachedFilteredTargets = _defaultTargetList;
+            _cachedFilteredStars = _defaultStarList;
+            _lastTargetQuery = string.Empty;
+            _lastStarQuery = string.Empty;
+
             _isLoaded = true;
 
             if (_selectedTarget is not null && _selectedStar is null)
             {
                 ApplySuggestedStarSearchText(_selectedTarget);
             }
+
+            RefreshNearbyTargetSuggestions();
         }
         catch (Exception ex)
         {
@@ -239,8 +291,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
         var targetCoord = new EquatorialCoordinate(target.RightAscensionHours, target.DeclinationDeg);
 
-        var nearbyBrightStar = _allStars
+        var candidateStars = (_starSpatialIndex?.Query(target.RightAscensionHours, target.DeclinationDeg, MaxSeparationDeg) ?? _allStars)
             .Where(s => s.VisualMagnitude <= MaxMagnitude)
+            .ToList();
+
+        var nearbyBrightStar = candidateStars
             .Select(s => new
             {
                 Star = s,
@@ -271,6 +326,95 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         }
 
         return null;
+    }
+
+    private void RefreshNearbyTargetSuggestions()
+    {
+        if (_selectedStar is null || _allTargets.Count == 0 || _allStars.Count == 0)
+        {
+            _nearbyTargetSuggestions = [];
+            OnPropertyChanged(nameof(NearbyTargetSuggestions));
+            OnPropertyChanged(nameof(HasNearbyTargetSuggestions));
+            OnPropertyChanged(nameof(NearbyTargetHeaderText));
+            return;
+        }
+
+        var referenceCoord = new EquatorialCoordinate(_selectedStar.RightAscensionHours, _selectedStar.DeclinationDeg);
+
+        _nearbyTargetSuggestions = _allTargets
+            .Where(target => _selectedTarget is null || !string.Equals(target.Id, _selectedTarget.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(target =>
+            {
+                var targetCoord = new EquatorialCoordinate(target.RightAscensionHours, target.DeclinationDeg);
+                var relative = SphericalGeometry.ComputeRelativePosition(referenceCoord, targetCoord);
+                return new { Target = target, Relative = relative };
+            })
+            .Where(x => x.Relative.AngularSeparationDegrees <= NearbyTargetMaxSeparationDeg)
+            .Select(x =>
+            {
+                var routeCandidates = _starSpatialIndex?.Query(x.Target.RightAscensionHours, x.Target.DeclinationDeg, 30.0)
+                    ?? _searchableStars;
+                var route = _hopGenerator.GenerateRoute(_selectedStar, x.Target, routeCandidates);
+                var hopCount = route.Steps.Count;
+                var easeScore = ComputeNearbyTargetEaseScore(x.Relative.AngularSeparationDegrees, hopCount);
+                var direction = FormatSkyDirection(x.Relative.PositionAngleDegrees);
+                var easeLabel = FormatEaseLabel(x.Relative.AngularSeparationDegrees, hopCount);
+                var hopLabel = FormatHopLabel(x.Relative.AngularSeparationDegrees, hopCount);
+
+                return new NearbyTargetSuggestion(
+                    x.Target,
+                    x.Relative.AngularSeparationDegrees,
+                    x.Relative.PositionAngleDegrees,
+                    direction,
+                    hopCount,
+                    easeScore,
+                    easeLabel,
+                    $"{x.Relative.AngularSeparationDegrees:F1}° {direction} • {hopLabel}");
+            })
+            .Where(x => x.SeparationDegrees <= 18.0 || (x.SeparationDegrees <= NearbyTargetMaxSeparationDeg && x.HopCount <= 1))
+            .OrderBy(x => x.EaseScore)
+            .ThenBy(x => x.SeparationDegrees)
+            .ThenBy(x => x.DisplayName)
+            .Take(10)
+            .ToList();
+
+        OnPropertyChanged(nameof(NearbyTargetSuggestions));
+        OnPropertyChanged(nameof(HasNearbyTargetSuggestions));
+        OnPropertyChanged(nameof(NearbyTargetHeaderText));
+    }
+
+    private static double ComputeNearbyTargetEaseScore(double separationDegrees, int hopCount) =>
+        separationDegrees + (hopCount * 2.0);
+
+    private static string FormatEaseLabel(double separationDegrees, int hopCount)
+    {
+        var score = ComputeNearbyTargetEaseScore(separationDegrees, hopCount);
+        if (score <= 5.0) return "Very easy";
+        if (score <= 9.0) return "Easy";
+        if (score <= 14.0) return "Good";
+        return "Longer";
+    }
+
+    private static string FormatHopLabel(double separationDegrees, int hopCount)
+    {
+        if (separationDegrees <= 4.0)
+        {
+            return "very short hop";
+        }
+
+        return hopCount switch
+        {
+            0 => separationDegrees <= 9.0 ? "direct hop" : "wide direct hop",
+            1 => "1 bright-star hop",
+            _ => $"{hopCount} hops"
+        };
+    }
+
+    private static string FormatSkyDirection(double positionAngleDegrees)
+    {
+        string[] labels = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
+        var index = (int)Math.Round((((positionAngleDegrees % 360.0) + 360.0) % 360.0) / 22.5, MidpointRounding.AwayFromZero) % labels.Length;
+        return labels[index];
     }
 
     public void BeginTargetSearch()
@@ -379,28 +523,42 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             return;
         }
 
-        var route = _hopGenerator.GenerateRoute(anchor.AnchorStar, _selectedTarget, _catalog.GetStars());
+        var referenceStar = _selectedStar ?? anchor.AnchorStar;
         var useObserverOrientationRequested = _observerOrientationService.IsLocationOrientationEnabled;
         var observerContext = await _observerOrientationService.TryGetObserverContextAsync();
 
-        var mapData = BuildStarMapData(anchor, route, targetCoord, observerContext, useObserverOrientationRequested);
+        // Move the heavy CPU work (trig over 8870 stars) off the main thread to prevent ANR.
+        // Hop waypoints use named stars only — HIP-numbered entries are not identifiable by users.
+        var namedStars = _searchableStars;
+        var allStars = _allStars;
+        var (route, mapData) = await Task.Run(() =>
+        {
+            var r = _hopGenerator.GenerateRoute(referenceStar, _selectedTarget!, namedStars);
+            var md = BuildStarMapData(anchor, referenceStar, r, targetCoord, observerContext, useObserverOrientationRequested);
+            return (r, md);
+        });
+
         if (mapData is not null)
         {
             ShowStarMap?.Invoke(mapData);
             return;
         }
 
+        var referenceCoord = new EquatorialCoordinate(referenceStar.RightAscensionHours, referenceStar.DeclinationDeg);
+        var relativeToReference = SphericalGeometry.ComputeRelativePosition(referenceCoord, targetCoord);
+
         var lines = new List<string>
         {
             $"Star Hop Map: {_selectedTarget.DisplayName}",
-            $"Anchor: {anchor.Asterism.DisplayName} → {anchor.AnchorStar.DisplayName}",
-            $"Distance to target: {anchor.AngularDistanceDegrees:F1}°",
+            $"Reference star: {referenceStar.DisplayName}",
+            $"Target from reference: {relativeToReference.AngularSeparationDegrees:F1}° {FormatSkyDirection(relativeToReference.PositionAngleDegrees)}",
+            $"Pattern context: {anchor.Asterism.DisplayName} → {anchor.AnchorStar.DisplayName}",
             ""
         };
 
         if (route.Steps.Count == 0)
         {
-            lines.Add("Direct hop — target is near the anchor star.");
+            lines.Add($"Direct hop — target is near {referenceStar.DisplayName}.");
         }
         else
         {
@@ -417,6 +575,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
     private StarMapData? BuildStarMapData(
         AnchorResult anchor,
+        CatalogStar referenceStar,
         HopRoute route,
         EquatorialCoordinate targetCoord,
         ObserverOrientationContext? observerContext,
@@ -456,10 +615,10 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         // Build hop steps list: anchor star first, then each hop ToStar
         var hopSteps = new List<StarMapPoint>
         {
-            new(anchor.AnchorStar.RightAscensionHours,
-                anchor.AnchorStar.DeclinationDeg,
-                anchor.AnchorStar.VisualMagnitude,
-                anchor.AnchorStar.DisplayName)
+            new(referenceStar.RightAscensionHours,
+                referenceStar.DeclinationDeg,
+                referenceStar.VisualMagnitude,
+                referenceStar.DisplayName)
         };
 
         foreach (var step in route.Steps)
@@ -488,6 +647,9 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
         // Set of HIP IDs already drawn as asterism/hop stars.
         var drawnHipIds = new HashSet<int>(anchor.Asterism.StarIds);
+        if (referenceStar.HipparcosId.HasValue)
+            drawnHipIds.Add(referenceStar.HipparcosId.Value);
+
         foreach (var step in route.Steps)
         {
             if (step.ToStar.HipparcosId.HasValue)
@@ -496,13 +658,14 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
                 drawnHipIds.Add(step.FromStar.HipparcosId.Value);
         }
 
-        var backgroundStars = _catalog.GetStars()
+        // Two-step background star selection so we can track which HIP IDs are already plotted.
+        var selectedBackgroundEntries = _catalog.GetStars()
             .Where(s => !s.HipparcosId.HasValue || !drawnHipIds.Contains(s.HipparcosId.Value))
             .Select(s =>
             {
                 var coord = new EquatorialCoordinate(s.RightAscensionHours, s.DeclinationDeg);
                 var distanceFromTarget = SphericalGeometry.AngularSeparationDegrees(targetCoord, coord);
-                return new { Star = s, DistanceFromTarget = distanceFromTarget };
+                return (Star: s, DistanceFromTarget: distanceFromTarget);
             })
             .Where(x =>
                 (x.Star.VisualMagnitude <= 6.2 && x.DistanceFromTarget <= contextFieldRadius) ||
@@ -510,6 +673,47 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             .OrderBy(x => x.Star.VisualMagnitude)
             .ThenBy(x => x.DistanceFromTarget)
             .Take(140)
+            .ToList();
+
+        var backgroundStars = selectedBackgroundEntries
+            .Select(x => new StarMapPoint(x.Star.RightAscensionHours, x.Star.DeclinationDeg, x.Star.VisualMagnitude, null))
+            .ToList();
+
+        // Additional field stars that fill the rendered map viewport rectangle.
+        // The map is centered on the average of all key coords and the viewport covers a
+        // rectangular region that extends ~√2 × maxSep from centre (rectangle corners) plus
+        // 18 % padding.  Use 1.7× to reliably cover those corners without an expensive exact
+        // projection computation here.
+        var mapCenterRaHours = keyCoordinates.Average(c => c.RaHours);
+        var mapCenterDecDeg = keyCoordinates.Average(c => c.DecDegrees);
+        var mapCenter = new EquatorialCoordinate(mapCenterRaHours, mapCenterDecDeg);
+
+        var maxSepFromMapCenter = keyCoordinates
+            .Select(coord => SphericalGeometry.AngularSeparationDegrees(mapCenter, coord))
+            .DefaultIfEmpty(0.0)
+            .Max();
+
+        var mapFillRadius = Math.Max(maxSepFromMapCenter * 1.7, 8.0);
+
+        var allPlottedIds = new HashSet<int>(drawnHipIds);
+        foreach (var entry in selectedBackgroundEntries)
+        {
+            if (entry.Star.HipparcosId.HasValue)
+                allPlottedIds.Add(entry.Star.HipparcosId.Value);
+        }
+
+        var mapFillStars = _catalog.GetStars()
+            .Where(s => !s.HipparcosId.HasValue || !allPlottedIds.Contains(s.HipparcosId.Value))
+            .Select(s =>
+            {
+                var coord = new EquatorialCoordinate(s.RightAscensionHours, s.DeclinationDeg);
+                var distFromCenter = SphericalGeometry.AngularSeparationDegrees(mapCenter, coord);
+                return (Star: s, DistFromCenter: distFromCenter);
+            })
+            .Where(x => x.Star.VisualMagnitude <= 7.5 && x.DistFromCenter <= mapFillRadius)
+            .OrderBy(x => x.Star.VisualMagnitude)
+            .ThenBy(x => x.DistFromCenter)
+            .Take(300)
             .Select(x => new StarMapPoint(x.Star.RightAscensionHours, x.Star.DeclinationDeg, x.Star.VisualMagnitude, null))
             .ToList();
 
@@ -528,10 +732,12 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
                 _selectedTarget.VisualMagnitude ?? 10.0,
                 _selectedTarget.DisplayName),
             AsterismName = anchor.Asterism.DisplayName,
+            ReferenceLabel = referenceStar.DisplayName,
             AsterismStars = asterismStars,
             AsterismSegments = segments,
             HopSteps = hopSteps,
             BackgroundStars = backgroundStars,
+            MapFillStars = mapFillStars,
             UseObserverOrientation = observerContext is not null,
             ObserverLatitudeDeg = observerContext?.LatitudeDegrees,
             ObserverLongitudeDeg = observerContext?.LongitudeDegrees,
@@ -680,4 +886,18 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }
+}
+
+public sealed record NearbyTargetSuggestion(
+    CatalogTarget Target,
+    double SeparationDegrees,
+    double PositionAngleDegrees,
+    string DirectionText,
+    int HopCount,
+    double EaseScore,
+    string EaseLabel,
+    string SummaryText)
+{
+    public string DisplayName => Target.DisplayName;
+    public string CategoryText => Target.Category.ToString();
 }

@@ -21,6 +21,8 @@
 
         <ScrollView Grid.Row="1">
             <VerticalStackLayout Spacing="12">
+
+                <!-- Location orientation card -->
                 <Border BackgroundColor="{DynamicResource ColorSurface}"
                         Stroke="{DynamicResource ColorBorder}"
                         StrokeThickness="1"
@@ -57,6 +59,41 @@
                                LineBreakMode="WordWrap" />
                     </VerticalStackLayout>
                 </Border>
+
+                <!-- AR camera card -->
+                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                        Stroke="{DynamicResource ColorBorder}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 14"
+                        Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Use camera for AR sky view"
+                                       FontAttributes="Bold"
+                                       FontSize="15"
+                                       TextColor="{DynamicResource ColorTextPrimary}" />
+                                <Label Text="When enabled, AstroFinder may use your phone&#x2019;s camera as a live background for the star-hop overlay. Point your phone at the sky and the anchor star, hop path, and target are drawn over the live camera view. The camera feed is never recorded or transmitted."
+                                       FontSize="13"
+                                       TextColor="{DynamicResource ColorTextSecondary}"
+                                       LineBreakMode="WordWrap" />
+                            </VerticalStackLayout>
+
+                            <Switch Grid.Column="1"
+                                    x:Name="ArCameraToggle"
+                                    IsToggled="{Binding UseArCamera}"
+                                    OnColor="{DynamicResource ColorPrimary}"
+                                    Toggled="OnArCameraToggleChanged"
+                                    VerticalOptions="Center" />
+                        </Grid>
+
+                        <Label Text="{Binding ArStatusText}"
+                               FontSize="12"
+                               TextColor="{DynamicResource ColorTextSecondary}"
+                               LineBreakMode="WordWrap" />
+                    </VerticalStackLayout>
+                </Border>
+
             </VerticalStackLayout>
         </ScrollView>
 

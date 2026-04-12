@@ -30,5 +30,7 @@
 	<string>Assets.xcassets/appicon.appiconset</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>AstroFinder uses your location to orient star hop maps to match the sky you see.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>AstroFinder uses your camera as a live background for the AR star-hop overlay. The camera feed is never recorded or transmitted.</string>
 </dict>
 </plist>

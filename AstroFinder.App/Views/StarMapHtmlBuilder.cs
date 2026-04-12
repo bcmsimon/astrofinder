@@ -1,7 +1,5 @@
 using System.Net;
 using System.Text;
-using AstroFinder.Engine.Geometry;
-using AstroFinder.Engine.Primitives;
 using Microsoft.Maui.Graphics;
 
 namespace AstroFinder.App.Views;
@@ -101,25 +99,14 @@ internal static class StarMapHtmlBuilder
             Math.Max(0, plotRect.Width - (2 * PlotInset)),
             Math.Max(0, plotRect.Height - (2 * PlotInset)));
 
-        var useObserverOrientation = data.UseObserverOrientation
-            && data.ObserverLatitudeDeg.HasValue
-            && data.ObserverLongitudeDeg.HasValue;
-
+        // Always use equatorial (RA/Dec) coordinates for the 2D star map projection.
+        // Alt/Az coordinates cause severe distortion near the zenith: when a circumpolar
+        // asterism like the Big Dipper is at 80°+ altitude (typical at mid-northern
+        // latitudes in spring), a tiny RA difference becomes a huge azimuth span
+        // (÷cos(alt)), making the asterism shape unrecognisable.
+        // The live AR view handles sky-matched orientation separately.
         (double LonDeg, double LatDeg) ToProjectionCoordinates(double raHours, double decDegrees)
-        {
-            if (useObserverOrientation)
-            {
-                var horizontal = SkyProjection.EquatorialToHorizontal(
-                    new EquatorialCoordinate(raHours, decDegrees),
-                    data.ObserverLatitudeDeg!.Value,
-                    data.ObserverLongitudeDeg!.Value,
-                    data.ObservationTime);
-
-                return (horizontal.AzimuthDegrees, horizontal.AltitudeDegrees);
-            }
-
-            return (raHours * 15.0, decDegrees);
-        }
+            => (raHours * 15.0, decDegrees);
 
         var allPoints = new List<(double lon, double lat)>
         {
@@ -249,10 +236,17 @@ internal static class StarMapHtmlBuilder
         sb.Append($"<line x1='{usableRect.Left:F1}' y1='{centerPoint.Y:F1}' x2='{usableRect.Right:F1}' y2='{centerPoint.Y:F1}' stroke='{ToCss(borderColor, 0.45f)}' stroke-width='1.5' />");
         sb.Append($"<line x1='{centerPoint.X:F1}' y1='{usableRect.Top:F1}' x2='{centerPoint.X:F1}' y2='{usableRect.Bottom:F1}' stroke='{ToCss(borderColor, 0.45f)}' stroke-width='1.5' />");
 
+        foreach (var star in data.MapFillStars)
+        {
+            var pt = ToCanvas(star.RaHours, star.DecDeg);
+            var r = StarRadius(star.Magnitude) * 1.1f;
+            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{r:F1}' fill='{ToCss(textSecondary, BackgroundStarAlpha(star.Magnitude) * 0.6f)}' />");
+        }
+
         foreach (var star in data.BackgroundStars)
         {
             var pt = ToCanvas(star.RaHours, star.DecDeg);
-            var r = StarRadius(star.Magnitude) * 0.7f;
+            var r = StarRadius(star.Magnitude) * 1.4f;
             sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{r:F1}' fill='{ToCss(textSecondary, BackgroundStarAlpha(star.Magnitude))}' />");
         }
 

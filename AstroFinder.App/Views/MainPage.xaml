@@ -20,12 +20,18 @@
                    VerticalTextAlignment="Center"
                    TextColor="{DynamicResource ColorPrimary}" />
 
-            <ui:AppIconButton Grid.Column="2"
-                              IconGlyph="&#x2699;"
-                              Variant="Primary"
-                              Size="44"
-                              SemanticProperties.Description="Open settings"
-                              Command="{Binding Source={x:Reference Root}, Path=OpenSettingsCommand}" />
+            <Label Grid.Column="2"
+                   Text="&#x2699;"
+                   FontSize="24"
+                   TextColor="{DynamicResource ColorPrimary}"
+                   VerticalTextAlignment="Center"
+                   HorizontalTextAlignment="Center"
+                   Padding="8,4"
+                   SemanticProperties.Description="Open settings">
+                <Label.GestureRecognizers>
+                    <TapGestureRecognizer Command="{Binding Source={x:Reference Root}, Path=OpenSettingsCommand}" />
+                </Label.GestureRecognizers>
+            </Label>
         </Grid>
 
         <!-- Content -->
@@ -48,15 +54,16 @@
                                TextColor="{DynamicResource ColorTextInverse}"
                                FontSize="14"
                                VerticalTextAlignment="Center" />
-                        <Label Grid.Column="1"
-                               Text="✕"
-                               TextColor="{DynamicResource ColorTextInverse}"
-                               FontSize="14"
-                               VerticalTextAlignment="Center">
-                            <Label.GestureRecognizers>
-                                <TapGestureRecognizer Command="{Binding ClearTargetCommand}" />
-                            </Label.GestureRecognizers>
-                        </Label>
+                        <Button Grid.Column="1"
+                                Text="✕"
+                                Command="{Binding ClearTargetCommand}"
+                                BackgroundColor="Transparent"
+                                BorderWidth="0"
+                                Padding="4,0"
+                                FontSize="14"
+                                TextColor="{DynamicResource ColorTextInverse}"
+                                VerticalOptions="Center"
+                                HorizontalOptions="End" />
                     </Grid>
                 </Border>
 
@@ -220,6 +227,64 @@
                             </DataTemplate>
                         </CollectionView.ItemTemplate>
                     </CollectionView>
+                </Border>
+
+                <!-- Nearby targets from the selected reference star -->
+                <Border IsVisible="{Binding HasNearbyTargetSuggestions}"
+                        Style="{DynamicResource CardBorder}"
+                        Padding="12"
+                        Margin="0,4,0,0">
+                    <VerticalStackLayout Spacing="8">
+                        <Label Text="{Binding NearbyTargetHeaderText}"
+                               TextColor="{DynamicResource ColorTextPrimary}"
+                               FontAttributes="Bold"
+                               FontSize="14" />
+                        <Label Text="Tap a nearby target to make it the current hop target."
+                               TextColor="{DynamicResource ColorTextSecondary}"
+                               FontSize="12" />
+
+                        <CollectionView x:Name="NearbyTargetsList"
+                                        ItemsSource="{Binding NearbyTargetSuggestions}"
+                                        SelectionMode="None"
+                                        MaximumHeightRequest="260"
+                                        VerticalScrollBarVisibility="Always">
+                            <CollectionView.ItemsLayout>
+                                <LinearItemsLayout Orientation="Vertical" ItemSpacing="6" />
+                            </CollectionView.ItemsLayout>
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                            Stroke="{DynamicResource ColorBorder}"
+                                            StrokeThickness="1"
+                                            Padding="12,10"
+                                            StrokeShape="RoundRectangle 8">
+                                        <Border.GestureRecognizers>
+                                            <TapGestureRecognizer Tapped="OnNearbyTargetTapped" />
+                                        </Border.GestureRecognizers>
+                                        <VerticalStackLayout Spacing="3">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <Label Text="{Binding DisplayName}"
+                                                       TextColor="{DynamicResource ColorTextPrimary}"
+                                                       FontSize="14" />
+                                                <Label Grid.Column="1"
+                                                       Text="{Binding EaseLabel}"
+                                                       TextColor="{DynamicResource ColorAccent}"
+                                                       FontSize="11"
+                                                       FontAttributes="Bold"
+                                                       VerticalTextAlignment="Center" />
+                                            </Grid>
+                                            <Label Text="{Binding SummaryText}"
+                                                   TextColor="{DynamicResource ColorTextSecondary}"
+                                                   FontSize="12" />
+                                            <Label Text="{Binding CategoryText}"
+                                                   TextColor="{DynamicResource ColorTextMuted}"
+                                                   FontSize="11" />
+                                        </VerticalStackLayout>
+                                    </Border>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
                 </Border>
 
                 <!-- Action Buttons -->

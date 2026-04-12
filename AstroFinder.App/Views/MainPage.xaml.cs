@@ -11,15 +11,21 @@ public partial class MainPage : ContentPage
     private readonly MainPageViewModel _vm;
     private readonly AstroFinderSettingsModuleBootstrapper _settingsBootstrapper;
     private readonly ISharedSettingsPageService _settingsPageService;
+    private readonly IDeviceOrientationService _deviceOrientationService;
+    private readonly ObserverOrientationService _observerOrientationService;
 
     public MainPage(
         MainPageViewModel viewModel,
         AstroFinderSettingsModuleBootstrapper settingsBootstrapper,
-        ISharedSettingsPageService settingsPageService)
+        ISharedSettingsPageService settingsPageService,
+        IDeviceOrientationService deviceOrientationService,
+        ObserverOrientationService observerOrientationService)
     {
         _vm = viewModel;
         _settingsBootstrapper = settingsBootstrapper;
         _settingsPageService = settingsPageService;
+        _deviceOrientationService = deviceOrientationService;
+        _observerOrientationService = observerOrientationService;
 
         // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
         OpenSettingsCommand = new Command(async () => await OpenSettingsAsync());
@@ -29,7 +35,8 @@ public partial class MainPage : ContentPage
 
         _vm.ShowStarMap += async data =>
         {
-            await Navigation.PushModalAsync(new StarMapPage(data));
+            await Navigation.PushModalAsync(
+                new StarMapPage(data, _deviceOrientationService, _observerOrientationService));
         };
     }
 
@@ -135,6 +142,14 @@ public partial class MainPage : ContentPage
         {
             _vm.SelectStar(star);
             StarSearchBar.Unfocus();
+        }
+    }
+
+    private void OnNearbyTargetTapped(object? sender, TappedEventArgs e)
+    {
+        if ((sender as BindableObject)?.BindingContext is NearbyTargetSuggestion suggestion)
+        {
+            _vm.SelectTarget(suggestion.Target);
         }
     }
 

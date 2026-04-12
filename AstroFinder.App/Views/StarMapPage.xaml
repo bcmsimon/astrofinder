@@ -2,7 +2,6 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="AstroFinder.App.Views.StarMapPage"
-             Title="Star Hop Map"
              BackgroundColor="{DynamicResource ColorBackground}">
 
     <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12" Padding="16">
@@ -14,19 +13,20 @@
                 StrokeThickness="1"
                 StrokeShape="RoundRectangle 14"
                 Padding="16,12">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-                <Label Text="Star Hop Map"
-                       FontSize="16"
-                       FontAttributes="Bold"
-                       TextColor="{DynamicResource ColorTextPrimary}"
-                       VerticalOptions="Center" />
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="12">
                 <Button Grid.Column="1"
+                        Text="AR View"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorPrimary}"
+                        FontSize="14"
+                        Clicked="OnArViewClicked" />
+                <Button Grid.Column="2"
                         Text="Reset"
                         BackgroundColor="Transparent"
                         TextColor="{DynamicResource ColorPrimary}"
                         FontSize="14"
                         Clicked="OnResetClicked" />
-                <Button Grid.Column="2"
+                <Button Grid.Column="3"
                         Text="Close"
                         BackgroundColor="Transparent"
                         TextColor="{DynamicResource ColorPrimary}"

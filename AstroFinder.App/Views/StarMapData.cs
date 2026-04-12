@@ -18,6 +18,7 @@ public sealed class StarMapData
     public required StarMapPoint Target { get; init; }
     public required IReadOnlyList<StarMapPoint> AsterismStars { get; init; }
     public required string AsterismName { get; init; }
+    public string ReferenceLabel { get; init; } = string.Empty;
 
     /// <summary>
     /// Pairs of indices into <see cref="AsterismStars"/> defining the asterism line pattern.
@@ -33,6 +34,13 @@ public sealed class StarMapData
     /// Nearby background stars for context.
     /// </summary>
     public required IReadOnlyList<StarMapPoint> BackgroundStars { get; init; }
+
+    /// <summary>
+    /// Additional field stars covering the full rendered map viewport rectangle (including
+    /// corners not reached by the circular background-star query). Shown in the 2D star map
+    /// only — not used in the AR overlay.
+    /// </summary>
+    public required IReadOnlyList<StarMapPoint> MapFillStars { get; init; }
 
     /// <summary>
     /// Whether the map is rotated into the observer's local sky orientation.

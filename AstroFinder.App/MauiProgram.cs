@@ -19,7 +19,8 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .UseAstroAppsDesignSystem()
             .UseAstroAppsMauiTheming()
-            .UseMauiCommunityToolkit();
+            .UseMauiCommunityToolkit()
+            .UseMauiCommunityToolkitCamera();
 
 #if DEBUG
         builder.Logging.AddDebug();
@@ -37,6 +38,16 @@ public static class MauiProgram
         builder.Services.AddSingleton<AstroFinderSettingsModuleBootstrapper>();
         builder.Services.AddSingleton<AppCatalogProvider>();
         builder.Services.AddSingleton<ObserverOrientationService>();
+#if ANDROID
+        // Android: use TYPE_GAME_ROTATION_VECTOR (gyro + accel, no magnetometer).
+        // Magnetometer noise causes heading jumps that make AR overlays teleport.
+        builder.Services.AddSingleton<IDeviceOrientationService, AndroidOrientationService>();
+#else
+        // iOS/macOS: MAUI OrientationSensor wraps CMAttitudeReferenceFrame.XArbitraryZVertical
+        // which is already gyro-based — no magnetometer noise on those platforms.
+        builder.Services.AddSingleton<IDeviceOrientationService, DeviceOrientationService>();
+#endif
+        builder.Services.AddSingleton<ArCameraService>();
 
         // Pages
         builder.Services.AddTransient<MainPage>();
