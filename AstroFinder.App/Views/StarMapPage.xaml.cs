@@ -8,16 +8,19 @@ public partial class StarMapPage : ContentPage
     private readonly string _mapHtml;
     private readonly IDeviceOrientationService _deviceOrientationService;
     private readonly ObserverOrientationService _observerOrientationService;
+    private readonly IArFrameSource _arFrameSource;
     private double _lastViewportSide;
 
     public StarMapPage(
         StarMapData data,
         IDeviceOrientationService deviceOrientationService,
-        ObserverOrientationService observerOrientationService)
+        ObserverOrientationService observerOrientationService,
+        IArFrameSource arFrameSource)
     {
         _data = data;
         _deviceOrientationService = deviceOrientationService;
         _observerOrientationService = observerOrientationService;
+        _arFrameSource = arFrameSource;
 
         InitializeComponent();
 
@@ -113,7 +116,7 @@ public partial class StarMapPage : ContentPage
         // when the camera is unavailable.
         _ = status; // used above; explicit discard avoids warning
         await Navigation.PushModalAsync(
-            new ArStarHopPage(_data, _deviceOrientationService, _observerOrientationService));
+            new ArStarHopPage(_data, _deviceOrientationService, _observerOrientationService, _arFrameSource));
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)

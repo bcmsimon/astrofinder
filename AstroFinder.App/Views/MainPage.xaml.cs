@@ -3,6 +3,7 @@ using AstroApps.Equipment.Profiles.Models;
 using AstroApps.Maui.UIKit.Settings;
 using AstroFinder.App.Services;
 using AstroFinder.App.ViewModels;
+using CommunityToolkit.Maui.Core.Platform;
 
 namespace AstroFinder.App.Views;
 
@@ -13,19 +14,25 @@ public partial class MainPage : ContentPage
     private readonly ISharedSettingsPageService _settingsPageService;
     private readonly IDeviceOrientationService _deviceOrientationService;
     private readonly ObserverOrientationService _observerOrientationService;
+    private readonly IArFrameSource _arFrameSource;
+    private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
 
     public MainPage(
         MainPageViewModel viewModel,
         AstroFinderSettingsModuleBootstrapper settingsBootstrapper,
         ISharedSettingsPageService settingsPageService,
         IDeviceOrientationService deviceOrientationService,
-        ObserverOrientationService observerOrientationService)
+        ObserverOrientationService observerOrientationService,
+        IArFrameSource arFrameSource,
+        ManualGotoCalibrationService manualGotoCalibrationService)
     {
         _vm = viewModel;
         _settingsBootstrapper = settingsBootstrapper;
         _settingsPageService = settingsPageService;
         _deviceOrientationService = deviceOrientationService;
         _observerOrientationService = observerOrientationService;
+        _arFrameSource = arFrameSource;
+        _manualGotoCalibrationService = manualGotoCalibrationService;
 
         // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
         OpenSettingsCommand = new Command(async () => await OpenSettingsAsync());
@@ -36,7 +43,12 @@ public partial class MainPage : ContentPage
         _vm.ShowStarMap += async data =>
         {
             await Navigation.PushModalAsync(
-                new StarMapPage(data, _deviceOrientationService, _observerOrientationService));
+                new StarMapPage(data, _deviceOrientationService, _observerOrientationService, _arFrameSource));
+        };
+
+        _vm.ShowDeltasFlyout += async data =>
+        {
+            await Navigation.PushModalAsync(new RaDecDeltaPage(data, _manualGotoCalibrationService));
         };
     }
 
@@ -115,7 +127,9 @@ public partial class MainPage : ContentPage
     {
         if (e.CurrentSelection.FirstOrDefault() is CatalogTarget target)
         {
+            TargetSearchBar.Unfocus();
             _vm.SelectTarget(target);
+            _ = DismissSearchKeyboardsAsync();
         }
     }
 
@@ -123,7 +137,9 @@ public partial class MainPage : ContentPage
     {
         if (e.CurrentSelection.FirstOrDefault() is CatalogStar star)
         {
+            StarSearchBar.Unfocus();
             _vm.SelectStar(star);
+            _ = DismissSearchKeyboardsAsync();
         }
     }
 
@@ -131,8 +147,9 @@ public partial class MainPage : ContentPage
     {
         if ((sender as BindableObject)?.BindingContext is CatalogTarget target)
         {
-            _vm.SelectTarget(target);
             TargetSearchBar.Unfocus();
+            _vm.SelectTarget(target);
+            _ = DismissSearchKeyboardsAsync();
         }
     }
 
@@ -140,8 +157,9 @@ public partial class MainPage : ContentPage
     {
         if ((sender as BindableObject)?.BindingContext is CatalogStar star)
         {
-            _vm.SelectStar(star);
             StarSearchBar.Unfocus();
+            _vm.SelectStar(star);
+            _ = DismissSearchKeyboardsAsync();
         }
     }
 
@@ -175,5 +193,32 @@ public partial class MainPage : ContentPage
                 StarResultsList.ScrollTo(first, position: ScrollToPosition.Start, animate: false);
             }
         });
+    }
+
+    private async Task DismissSearchKeyboardsAsync()
+    {
+        try
+        {
+            TargetSearchBar.Unfocus();
+            StarSearchBar.Unfocus();
+#if ANDROID || IOS || WINDOWS
+            await TargetSearchBar.HideKeyboardAsync(CancellationToken.None);
+            await StarSearchBar.HideKeyboardAsync(CancellationToken.None);
+#endif
+
+            // Android can keep keyboard visible briefly during view transitions.
+            await Task.Delay(80);
+
+            TargetSearchBar.Unfocus();
+            StarSearchBar.Unfocus();
+#if ANDROID || IOS || WINDOWS
+            await TargetSearchBar.HideKeyboardAsync(CancellationToken.None);
+            await StarSearchBar.HideKeyboardAsync(CancellationToken.None);
+#endif
+        }
+        catch
+        {
+            // Do not block selection flow if keyboard APIs are unavailable on a platform.
+        }
     }
 }

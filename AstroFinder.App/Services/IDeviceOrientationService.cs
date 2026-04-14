@@ -3,23 +3,21 @@ using AstroFinder.Domain.AR;
 namespace AstroFinder.App.Services;
 
 /// <summary>
-/// Provides real-time device orientation data (compass heading + elevation pitch)
-/// by fusing the hardware compass and accelerometer.
+/// Provides real-time device orientation as a <see cref="PoseMatrix"/>
+/// that transforms ENU world vectors into camera coordinates.
 /// </summary>
 public interface IDeviceOrientationService
 {
-    /// <summary>The most recently computed device pose.</summary>
-    DevicePose CurrentPose { get; }
+    /// <summary>The most recently computed camera pose matrix.</summary>
+    PoseMatrix CurrentPose { get; }
 
     /// <summary>
-    /// True when the underlying sensors (compass + accelerometer) are
-    /// present and usable on this device.
+    /// True when the underlying sensors are present and usable on this device.
     /// </summary>
     bool IsAvailable { get; }
 
     /// <summary>
-    /// Starts the sensors.  Returns <c>true</c> if started successfully,
-    /// <c>false</c> if the sensors are unavailable or an error occurred.
+    /// Starts the sensors. Returns <c>true</c> if started successfully.
     /// </summary>
     Task<bool> StartAsync();
 
@@ -29,5 +27,10 @@ public interface IDeviceOrientationService
     /// <summary>
     /// Raised on the main thread whenever a new orientation reading is available.
     /// </summary>
-    event EventHandler<DevicePose>? PoseChanged;
+    event EventHandler<PoseMatrix>? PoseChanged;
+
+    /// <summary>
+    /// Stores a yaw offset so the current forward direction becomes the new reference.
+    /// </summary>
+    void Recenter();
 }

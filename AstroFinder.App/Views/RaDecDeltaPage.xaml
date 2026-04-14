@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ui="clr-namespace:AstroApps.Maui.UIKit.Controls;assembly=AstroApps.Maui.UIKit"
+             x:Class="AstroFinder.App.Views.RaDecDeltaPage"
+             x:Name="RootPage"
+             Title="RA/Dec Deltas"
+             BackgroundColor="{DynamicResource ColorBackground}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12" Padding="16">
+
+        <Border Grid.Row="0"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+             <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="2">
+                <Label x:Name="TitleLabel"
+                  Grid.Row="0"
+                       FontSize="16"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource ColorTextPrimary}"
+                       VerticalOptions="Center" />
+              <Label x:Name="ActiveMountLabel"
+                  Grid.Row="1"
+                  FontSize="12"
+                  TextColor="{DynamicResource ColorTextSecondary}" />
+                <ui:AppButton Grid.Column="1"
+                      Grid.Row="0"
+                      Grid.RowSpan="2"
+                              Text="Close"
+                              Variant="Secondary"
+                              MinimumWidthRequest="96"
+                              MinimumHeightRequest="44"
+                              HorizontalOptions="End"
+                              Command="{Binding Source={x:Reference RootPage}, Path=CloseCommand}" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 16"
+                Padding="16">
+            <Grid RowDefinitions="Auto,*" RowSpacing="10">
+                <ui:SectionHeader x:Name="ModeHeader" Title="Delta Summary" />
+                <ScrollView Grid.Row="1"
+                            Orientation="Vertical"
+                            VerticalScrollBarVisibility="Always">
+                    <VerticalStackLayout Spacing="10">
+                        <Label x:Name="DetailsLabel"
+                               FontSize="13"
+                               TextColor="{DynamicResource ColorTextPrimary}"
+                               LineBreakMode="WordWrap" />
+
+                        <VerticalStackLayout x:Name="AboutLinkRows"
+                                             IsVisible="False"
+                                             Spacing="6">
+                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                    Stroke="{DynamicResource ColorBorder}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="10,8">
+                                <Label Text="Kamil Pekala: https://www.youtube.com/@kamilkp"
+                                       FontSize="13"
+                                       TextColor="{DynamicResource ColorPrimary}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnKamilChannelTapped" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+
+                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                    Stroke="{DynamicResource ColorBorder}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="10,8">
+                                <Label Text="Andrea Minoia: https://www.youtube.com/@andreaminoia2002"
+                                       FontSize="13"
+                                       TextColor="{DynamicResource ColorPrimary}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnAndreaChannelTapped" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+
+                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                    Stroke="{DynamicResource ColorBorder}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="10,8">
+                                <Label Text="https://www.youtube.com/watch?v=tNPIMKOB9k4&amp;t=49s"
+                                       FontSize="13"
+                                       TextColor="{DynamicResource ColorPrimary}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnKamilVideoTapped" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+
+                            <Border BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                    Stroke="{DynamicResource ColorBorder}"
+                                    StrokeThickness="1"
+                                    StrokeShape="RoundRectangle 8"
+                                    Padding="10,8">
+                                <Label Text="https://www.youtube.com/watch?v=PYheSckraMo"
+                                       FontSize="13"
+                                       TextColor="{DynamicResource ColorPrimary}">
+                                    <Label.GestureRecognizers>
+                                        <TapGestureRecognizer Tapped="OnAndreaVideoTapped" />
+                                    </Label.GestureRecognizers>
+                                </Label>
+                            </Border>
+                        </VerticalStackLayout>
+                    </VerticalStackLayout>
+                </ScrollView>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <VerticalStackLayout Spacing="10">
+                <Label Text="Manual Goto guidance is tuned for Star Adventurer 2i motions."
+                       FontSize="12"
+                       TextColor="{DynamicResource ColorTextSecondary}"
+                       VerticalOptions="Center" />
+
+                  <Label x:Name="CalibrationStatusLabel"
+                      FontSize="12"
+                      TextColor="{DynamicResource ColorTextSecondary}" />
+
+                <FlexLayout Direction="Row"
+                            Wrap="Wrap"
+                            AlignItems="Center"
+                            JustifyContent="Start">
+                    <ui:AppButton x:Name="ManualGotoUIKitButton"
+                                  Text="Manual Goto"
+                                  Variant="Primary"
+                                  MinimumHeightRequest="44"
+                                  Margin="0,0,8,8"
+                                  HorizontalOptions="Start"
+                                  FlexLayout.Grow="1"
+                                  FlexLayout.Basis="150"
+                                  Command="{Binding Source={x:Reference RootPage}, Path=ToggleManualGotoCommand}" />
+
+                    <ui:AppButton x:Name="AboutManualGotoButton"
+                                  Text="About Manual Goto"
+                                  Variant="Secondary"
+                                  MinimumHeightRequest="44"
+                                  Margin="0,0,0,8"
+                                  HorizontalOptions="Start"
+                                  FlexLayout.Grow="1"
+                                  FlexLayout.Basis="170"
+                                  Command="{Binding Source={x:Reference RootPage}, Path=ToggleAboutManualGotoCommand}" />
+                </FlexLayout>
+
+                <ui:AppButton Text="Calibrate Directions"
+                              Variant="Secondary"
+                              MinimumWidthRequest="190"
+                              MinimumHeightRequest="44"
+                              HorizontalOptions="Start"
+                              Command="{Binding Source={x:Reference RootPage}, Path=CalibrateDirectionsCommand}" />
+            </VerticalStackLayout>
+        </Border>
+
+    </Grid>
+
+</ContentPage>

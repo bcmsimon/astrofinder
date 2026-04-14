@@ -40,6 +40,15 @@ public sealed class AstroFinderSettingsModuleBootstrapper
             order: 10));
 
         _registry.AddModule(new SettingsModuleDefinition(
+            id: "astrofinder-equipment-kit",
+            title: "Equipment kit",
+            description: "Choose mount and calibrate Manual Goto directions for that mount.",
+            iconGlyph: "",
+            section: SettingsModuleSection.General,
+            createPage: () => _services.GetRequiredService<EquipmentKitSettingsPage>(),
+            order: 15));
+
+        _registry.AddModule(new SettingsModuleDefinition(
             id: "astrofinder-orientation",
             title: "Sky orientation",
             description: "Use your location and current time to orient star hop maps to match the sky.",

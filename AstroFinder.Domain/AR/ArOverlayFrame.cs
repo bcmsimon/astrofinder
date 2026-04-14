@@ -2,24 +2,29 @@ namespace AstroFinder.Domain.AR;
 
 /// <summary>
 /// A complete projected AR frame ready for rendering.
-/// All screen coordinates are in the reference pixel space of <see cref="Viewport"/>;
-/// the renderer scales them to the actual canvas dimensions.
+/// All screen coordinates are in pixels with origin at top-left.
 /// </summary>
 public sealed record ArOverlayFrame(
-    ArProjectedPoint Target,
-    IReadOnlyList<ArProjectedPoint> AsterismStars,
+    ProjectedSkyObject Target,
+    IReadOnlyList<ProjectedSkyObject> AsterismStars,
     IReadOnlyList<(int From, int To)> AsterismSegments,
     /// <summary>Anchor star at index 0, then each hop star in order.</summary>
-    IReadOnlyList<ArProjectedPoint> HopSteps,
-    IReadOnlyList<ArProjectedPoint> BackgroundStars,
-    CameraViewport Viewport,
+    IReadOnlyList<ProjectedSkyObject> HopSteps,
+    IReadOnlyList<ProjectedSkyObject> BackgroundStars,
+    CameraIntrinsics Intrinsics,
     /// <summary>
-    /// Bearing from device pointing direction to the target, measured in degrees
-    /// clockwise from "up on screen" (i.e. higher altitude).
-    /// 0° = target is directly above, 90° = right, 180° = below, 270° = left.
+    /// Off-screen arrow guidance toward the target, or null when on-target.
     /// </summary>
-    double TargetBearingDegrees,
+    ArrowGuidance? OffscreenArrow,
     /// <summary>
-    /// Angular distance in degrees from the device pointing direction to the target.
+    /// Angular distance in degrees from the camera forward axis to the target.
     /// </summary>
-    double TargetAngularDistanceDegrees);
+    double TargetAngularDistanceDegrees,
+    /// <summary>
+    /// Text to show in the center reticle when on-target (null otherwise).
+    /// </summary>
+    string? CenterReticleText,
+    /// <summary>
+    /// Route line segments between consecutive hop nodes that are both visible.
+    /// </summary>
+    IReadOnlyList<(ArScreenPoint From, ArScreenPoint To)> RouteSegments);

@@ -20,7 +20,7 @@ public class SmokeTests
             new TargetCatalogManager(new InMemoryTargetCatalogRepository(targetSerializer), new TargetCatalogValidator()),
             new AsterismCatalogManager(new InMemoryAsterismCatalogRepository(asterismSerializer), new AsterismCatalogValidator()));
 
-        var vm = new MainPageViewModel(catalog, new ObserverOrientationService());
+        var vm = new MainPageViewModel(catalog, new ObserverOrientationService(), new ManualGotoCalibrationService());
         Assert.NotNull(vm.BuildMapCommand);
         Assert.NotNull(vm.ShowDeltasCommand);
         Assert.NotNull(vm.ClearTargetCommand);

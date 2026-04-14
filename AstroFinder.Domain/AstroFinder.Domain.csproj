@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AstroFinder.Domain.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\AstroFinder.Engine\AstroFinder.Engine.csproj" />
     <ProjectReference Include="..\..\astroprofiles\src\AstroApps.Equipment.Profiles\AstroApps.Equipment.Profiles.csproj" />
   </ItemGroup>

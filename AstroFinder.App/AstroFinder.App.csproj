@@ -52,6 +52,19 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Compile Remove="Services\FolderWatcherCaptureConfidenceService.Watcher.cs" />
+		<Compile Remove="Services\FolderWatcherCaptureConfidenceService.iOS.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
+		<Compile Include="Services\FolderWatcherCaptureConfidenceService.iOS.cs" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'ios'">
+		<Compile Include="Services\FolderWatcherCaptureConfidenceService.Watcher.cs" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Maui" Version="8.0.1" />
 		<PackageReference Include="CommunityToolkit.Maui.Camera" Version="1.0.5" />
 		<PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)" />

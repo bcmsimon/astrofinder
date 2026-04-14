@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:ui="clr-namespace:AstroApps.Maui.UIKit.Controls;assembly=AstroApps.Maui.UIKit"
+             x:Class="AstroFinder.App.Views.EquipmentKitSettingsPage"
+             x:Name="RootPage"
+             Title="Equipment kit"
+             BackgroundColor="{DynamicResource ColorBackground}">
+
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12" Padding="16">
+        <Border Grid.Row="0"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <VerticalStackLayout Spacing="4">
+                <Label Text="Equipment kit"
+                       FontSize="20"
+                       FontAttributes="Bold"
+                       TextColor="{DynamicResource ColorTextPrimary}" />
+                <Label Text="Choose your mount profile and keep Manual Goto direction calibration tied to that kit."
+                       FontSize="13"
+                       TextColor="{DynamicResource ColorTextSecondary}" />
+            </VerticalStackLayout>
+        </Border>
+
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="12">
+                <ui:EquipmentKitWizardView x:Name="WizardView"
+                                           PrimaryBadgeText="AstroFinder"
+                                           SecondaryBadgeText="Mount-aware Manual Goto" />
+                <Label x:Name="StatusLabel"
+                       FontSize="12"
+                       TextColor="{DynamicResource ColorTextSecondary}" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <Border Grid.Row="2"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                <ui:AppButton Grid.Column="0"
+                              Text="Save kit"
+                              Variant="Primary"
+                              MinimumWidthRequest="120"
+                              MinimumHeightRequest="44"
+                              Command="{Binding Source={x:Reference RootPage}, Path=SaveCommand}" />
+                <ui:AppButton Grid.Column="1"
+                              Text="Calibrate now"
+                              Variant="Secondary"
+                              MinimumWidthRequest="140"
+                              MinimumHeightRequest="44"
+                              Command="{Binding Source={x:Reference RootPage}, Path=CalibrateCommand}" />
+            </Grid>
+        </Border>
+    </Grid>
+
+</ContentPage>

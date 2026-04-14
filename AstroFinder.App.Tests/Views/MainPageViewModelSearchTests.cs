@@ -177,7 +177,7 @@ public class MainPageViewModelSearchTests
             new TargetCatalogManager(new InMemoryTargetCatalogRepository(targetSerializer), new TargetCatalogValidator()),
             new AsterismCatalogManager(new InMemoryAsterismCatalogRepository(asterismSerializer), new AsterismCatalogValidator()));
 
-        return new MainPageViewModel(catalog, new ObserverOrientationService());
+        return new MainPageViewModel(catalog, new ObserverOrientationService(), new ManualGotoCalibrationService());
     }
 
     private static void SetPrivateField(object instance, string fieldName, object value)
@@ -185,5 +185,20 @@ public class MainPageViewModelSearchTests
         var field = instance.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(field);
         field!.SetValue(instance, value);
+
+        if (fieldName == "_allStars" && value is IReadOnlyList<CatalogStar> stars)
+        {
+            var searchableField = instance.GetType().GetField("_searchableStars", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(searchableField);
+            searchableField!.SetValue(instance, stars);
+
+            var defaultField = instance.GetType().GetField("_defaultStarList", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(defaultField);
+            defaultField!.SetValue(instance, stars.Take(25).ToList());
+
+            var cachedField = instance.GetType().GetField("_cachedFilteredStars", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.NotNull(cachedField);
+            cachedField!.SetValue(instance, stars.Take(25).ToList());
+        }
     }
 }

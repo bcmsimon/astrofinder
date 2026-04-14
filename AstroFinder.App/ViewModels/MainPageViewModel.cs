@@ -16,6 +16,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 {
     private readonly AppCatalogProvider _catalog;
     private readonly ObserverOrientationService _observerOrientationService;
+    private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
     private readonly AnchorSelector _anchorSelector = new();
     private readonly HopGenerator _hopGenerator = new();
 
@@ -47,10 +48,14 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private IReadOnlyList<NearbyTargetSuggestion> _nearbyTargetSuggestions = [];
     private const double NearbyTargetMaxSeparationDeg = 24.0;
 
-    public MainPageViewModel(AppCatalogProvider catalog, ObserverOrientationService observerOrientationService)
+    public MainPageViewModel(
+        AppCatalogProvider catalog,
+        ObserverOrientationService observerOrientationService,
+        ManualGotoCalibrationService manualGotoCalibrationService)
     {
         _catalog = catalog;
         _observerOrientationService = observerOrientationService;
+        _manualGotoCalibrationService = manualGotoCalibrationService;
 
         BuildMapCommand = new Command(async () => await BuildStarHopMapAsync(), () => _selectedTarget is not null);
         ShowDeltasCommand = new Command(ShowDeltas, () => _selectedTarget is not null && _selectedStar is not null);
@@ -64,6 +69,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     /// Raised when a star map has been computed and should be displayed.
     /// </summary>
     public event Action<StarMapData>? ShowStarMap;
+
+    /// <summary>
+    /// Raised when RA/Dec deltas are computed and should be shown in a flyout.
+    /// </summary>
+    public event Action<RaDecDeltaFlyoutData>? ShowDeltasFlyout;
 
     public string TargetSearchText
     {
@@ -183,14 +193,22 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         if (q == _lastStarQuery) return;
         _lastStarQuery = q;
 
+        var searchableStars = _searchableStars.Count > 0 ? _searchableStars : _allStars;
+        var defaultStarList = _defaultStarList.Count > 0
+            ? _defaultStarList
+            : _allStars
+                .OrderBy(s => s.DisplayName, StringComparer.OrdinalIgnoreCase)
+                .Take(25)
+                .ToList();
+
         if (string.IsNullOrWhiteSpace(q))
         {
-            _cachedFilteredStars = _defaultStarList;
+            _cachedFilteredStars = defaultStarList;
         }
         else
         {
             // Search only named stars — "HIP xxxxxx" entries have no value in a pick list.
-            _cachedFilteredStars = _searchableStars
+            _cachedFilteredStars = searchableStars
                 .Select(star => new { Star = star, Rank = GetStarMatchRank(star, q) })
                 .Where(x => x.Rank < int.MaxValue)
                 .OrderBy(x => x.Rank)
@@ -755,15 +773,36 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
         var rel = SphericalGeometry.ComputeRelativePosition(refCoord, targetCoord);
 
-        var deltaRaMin = rel.DeltaRaDegrees * 60.0;
-        var deltaDecMin = rel.DeltaDecDegrees * 60.0;
+        var deltaHaHours = -rel.DeltaRaDegrees / 15.0;
 
-        ResultText = $"Deltas: {_selectedStar.DisplayName} → {_selectedTarget.DisplayName}\n\n" +
-                     $"ΔRA:  {FormatDelta(rel.DeltaRaDegrees)} ({deltaRaMin:+0.0;-0.0} arcmin)\n" +
-                     $"ΔDec: {FormatDelta(rel.DeltaDecDegrees)} ({deltaDecMin:+0.0;-0.0} arcmin)\n\n" +
-                     $"Separation: {rel.AngularSeparationDegrees:F2}°\n" +
-                     $"Position angle: {rel.PositionAngleDegrees:F1}° (N through E)";
+        var deltaText = $"Deltas: {_selectedStar.DisplayName} → {_selectedTarget.DisplayName}\n\n" +
+                        $"ΔRA:  {FormatDelta(rel.DeltaRaDegrees)}\n" +
+                        $"ΔDec: {FormatDelta(rel.DeltaDecDegrees)}\n" +
+                        $"ΔHA (RA move): {FormatSignedHours(deltaHaHours)}\n" +
+                        "HA is the RA-side move in mount time units (1.0h ≈ 15°).\n\n" +
+                        $"Separation: {rel.AngularSeparationDegrees:F2}°\n" +
+                        $"Position angle: {rel.PositionAngleDegrees:F1}° (N through E)\n\n" +
+                        "Tip: Use Manual Goto for step-by-step mount moves.";
+
+        ResultText = deltaText;
         HasResult = true;
+
+        ShowDeltasFlyout?.Invoke(new RaDecDeltaFlyoutData(
+            Title: "RA/Dec Deltas",
+            Details: deltaText,
+            ReferenceStarName: _selectedStar.DisplayName,
+            TargetName: _selectedTarget.DisplayName,
+            DeltaRaDegrees: rel.DeltaRaDegrees,
+            DeltaDecDegrees: rel.DeltaDecDegrees,
+            SelectedMountDisplayName: _manualGotoCalibrationService.GetSelectedMountName(),
+            IsManualGotoEnabled: IsManualGotoTemporarilyEnabled()));
+    }
+
+    private static bool IsManualGotoTemporarilyEnabled()
+    {
+        // Phase 1 temporary behavior: always enabled until multiple built-in mount
+        // profiles are available and mount-specific gating can be enforced.
+        return true;
     }
 
     private static string FormatRa(double hours)
@@ -787,7 +826,10 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     }
 
     private static string FormatDelta(double degrees) =>
-        degrees >= 0 ? $"+{degrees:F4}°" : $"{degrees:F4}°";
+        degrees >= 0 ? $"+{degrees:F1}°" : $"{degrees:F1}°";
+
+    private static string FormatSignedHours(double hours) =>
+        hours >= 0 ? $"+{hours:F1}h" : $"{hours:F1}h";
 
     private static string FormatLatitude(double latitudeDegrees) =>
         $"{Math.Abs(latitudeDegrees):F1}°{(latitudeDegrees >= 0 ? "N" : "S")}";
