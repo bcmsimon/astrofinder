@@ -14,6 +14,8 @@ public sealed class ArOverlayDrawable : IDrawable
     private ArOverlayFrame? _frame;
     private bool _isNightMode;
 
+    public bool IsMapOverlayActive { get; set; }
+
     public void Update(ArOverlayFrame frame) => _frame = frame;
     public void SetNightMode(bool isNightMode) => _isNightMode = isNightMode;
 
@@ -42,100 +44,103 @@ public sealed class ArOverlayDrawable : IDrawable
 
         canvas.SaveState();
 
-        // --- Asterism outline lines ---
-        if (_frame.AsterismStars.Count > 0 && _frame.AsterismSegments.Count > 0)
+        if (!IsMapOverlayActive)
         {
-            canvas.StrokeColor = primary.WithAlpha(0.7f);
-            canvas.StrokeSize = 1.5f;
-            foreach (var (from, to) in _frame.AsterismSegments)
+            // --- Asterism outline lines ---
+            if (_frame.AsterismStars.Count > 0 && _frame.AsterismSegments.Count > 0)
             {
-                if (from < 0 || from >= _frame.AsterismStars.Count) continue;
-                if (to < 0 || to >= _frame.AsterismStars.Count) continue;
-                var s1 = _frame.AsterismStars[from];
-                var s2 = _frame.AsterismStars[to];
-                if (!HasScreen(s1) || !HasScreen(s2)) continue;
-                canvas.DrawLine(ToCanvas(s1.ScreenPoint!.Value), ToCanvas(s2.ScreenPoint!.Value));
+                canvas.StrokeColor = primary.WithAlpha(0.7f);
+                canvas.StrokeSize = 1.5f;
+                foreach (var (from, to) in _frame.AsterismSegments)
+                {
+                    if (from < 0 || from >= _frame.AsterismStars.Count) continue;
+                    if (to < 0 || to >= _frame.AsterismStars.Count) continue;
+                    var s1 = _frame.AsterismStars[from];
+                    var s2 = _frame.AsterismStars[to];
+                    if (!HasScreen(s1) || !HasScreen(s2)) continue;
+                    canvas.DrawLine(ToCanvas(s1.ScreenPoint!.Value), ToCanvas(s2.ScreenPoint!.Value));
+                }
             }
-        }
 
-        // --- Asterism stars ---
-        canvas.FillColor = primary.WithAlpha(0.85f);
-        foreach (var star in _frame.AsterismStars)
-        {
-            if (!IsVisible(star)) continue;
-            canvas.FillCircle(ToCanvas(star.ScreenPoint!.Value), StarRadius(star.Magnitude));
-        }
-
-        // --- Hop route lines ---
-        if (_frame.HopSteps.Count > 0)
-        {
-            canvas.StrokeColor = accent;
-            canvas.StrokeSize = 2.0f;
-            canvas.StrokeDashPattern = [8, 5];
-
-            for (var i = 0; i < _frame.HopSteps.Count - 1; i++)
+            // --- Asterism stars ---
+            canvas.FillColor = primary.WithAlpha(0.85f);
+            foreach (var star in _frame.AsterismStars)
             {
-                var a = _frame.HopSteps[i];
-                var b = _frame.HopSteps[i + 1];
-                if (HasScreen(a) && HasScreen(b))
+                if (!IsVisible(star)) continue;
+                canvas.FillCircle(ToCanvas(star.ScreenPoint!.Value), StarRadius(star.Magnitude));
+            }
+
+            // --- Hop route lines ---
+            if (_frame.HopSteps.Count > 0)
+            {
+                canvas.StrokeColor = accent;
+                canvas.StrokeSize = 2.0f;
+                canvas.StrokeDashPattern = [8, 5];
+
+                for (var i = 0; i < _frame.HopSteps.Count - 1; i++)
+                {
+                    var a = _frame.HopSteps[i];
+                    var b = _frame.HopSteps[i + 1];
+                    if (HasScreen(a) && HasScreen(b))
+                        canvas.DrawLine(
+                            ToCanvas(a.ScreenPoint!.Value),
+                            ToCanvas(b.ScreenPoint!.Value));
+                }
+
+                var lastHop = _frame.HopSteps[^1];
+                if (HasScreen(lastHop) && HasScreen(_frame.Target))
                     canvas.DrawLine(
-                        ToCanvas(a.ScreenPoint!.Value),
-                        ToCanvas(b.ScreenPoint!.Value));
+                        ToCanvas(lastHop.ScreenPoint!.Value),
+                        ToCanvas(_frame.Target.ScreenPoint!.Value));
+
+                canvas.StrokeDashPattern = null;
+
+                canvas.FillColor = accent;
+                foreach (var hop in _frame.HopSteps.Skip(1))
+                {
+                    if (!IsVisible(hop)) continue;
+                    var pt = ToCanvas(hop.ScreenPoint!.Value);
+                    canvas.FillCircle(pt, StarRadius(hop.Magnitude) + 1f);
+                    DrawLabel(canvas, pt, hop.Label, accent);
+                }
             }
 
-            var lastHop = _frame.HopSteps[^1];
-            if (HasScreen(lastHop) && HasScreen(_frame.Target))
-                canvas.DrawLine(
-                    ToCanvas(lastHop.ScreenPoint!.Value),
-                    ToCanvas(_frame.Target.ScreenPoint!.Value));
-
-            canvas.StrokeDashPattern = null;
-
-            canvas.FillColor = accent;
-            foreach (var hop in _frame.HopSteps.Skip(1))
+            // --- Anchor star ---
+            if (_frame.HopSteps.Count > 0)
             {
-                if (!IsVisible(hop)) continue;
-                var pt = ToCanvas(hop.ScreenPoint!.Value);
-                canvas.FillCircle(pt, StarRadius(hop.Magnitude) + 1f);
-                DrawLabel(canvas, pt, hop.Label, accent);
+                var anchor = _frame.HopSteps[0];
+                if (IsVisible(anchor))
+                {
+                    var pt = ToCanvas(anchor.ScreenPoint!.Value);
+                    canvas.FillColor = success;
+                    canvas.FillCircle(pt, StarRadius(anchor.Magnitude));
+                    canvas.StrokeColor = success;
+                    canvas.StrokeSize = 2.2f;
+                    canvas.DrawCircle(pt, StarRadius(anchor.Magnitude) + 6f);
+                    DrawLabel(canvas, pt, anchor.Label, success);
+                }
             }
-        }
 
-        // --- Anchor star ---
-        if (_frame.HopSteps.Count > 0)
-        {
-            var anchor = _frame.HopSteps[0];
-            if (IsVisible(anchor))
+            // --- Target crosshair ---
+            var targetVisible = IsVisible(_frame.Target);
+            if (targetVisible && _frame.Target.ScreenPoint.HasValue)
             {
-                var pt = ToCanvas(anchor.ScreenPoint!.Value);
-                canvas.FillColor = success;
-                canvas.FillCircle(pt, StarRadius(anchor.Magnitude));
-                canvas.StrokeColor = success;
-                canvas.StrokeSize = 2.2f;
-                canvas.DrawCircle(pt, StarRadius(anchor.Magnitude) + 6f);
-                DrawLabel(canvas, pt, anchor.Label, success);
+                var tp = ToCanvas(_frame.Target.ScreenPoint.Value);
+                const float sz = 14f;
+                canvas.StrokeColor = error;
+                canvas.StrokeSize = 2.5f;
+                canvas.DrawLine(tp.X - sz, tp.Y, tp.X + sz, tp.Y);
+                canvas.DrawLine(tp.X, tp.Y - sz, tp.X, tp.Y + sz);
+                canvas.DrawCircle(tp, sz * 0.65f);
+                DrawLabel(canvas, tp, _frame.Target.Label, error, offsetY: sz + 6f);
             }
-        }
-
-        // --- Target crosshair ---
-        var targetVisible = IsVisible(_frame.Target);
-        if (targetVisible && _frame.Target.ScreenPoint.HasValue)
-        {
-            var tp = ToCanvas(_frame.Target.ScreenPoint.Value);
-            const float sz = 14f;
-            canvas.StrokeColor = error;
-            canvas.StrokeSize = 2.5f;
-            canvas.DrawLine(tp.X - sz, tp.Y, tp.X + sz, tp.Y);
-            canvas.DrawLine(tp.X, tp.Y - sz, tp.X, tp.Y + sz);
-            canvas.DrawCircle(tp, sz * 0.65f);
-            DrawLabel(canvas, tp, _frame.Target.Label, error, offsetY: sz + 6f);
-        }
+        } // end if (!IsMapOverlayActive)
 
         // --- Off-screen pointer arrow ---
-        DrawTargetPointer(canvas, dirtyRect, targetVisible, error);
+        DrawTargetPointer(canvas, dirtyRect, IsVisible(_frame.Target), error);
 
         // --- Route segment lines (from ArProjectionService) ---
-        if (_frame.RouteSegments.Count > 0)
+        if (!IsMapOverlayActive && _frame.RouteSegments.Count > 0)
         {
             canvas.StrokeColor = accent.WithAlpha(0.5f);
             canvas.StrokeSize = 1f;

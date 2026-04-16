@@ -41,4 +41,14 @@ public partial class SettingsPage : ContentPage
 
         await _viewModel.ApplyArCameraToggleAsync(e.Value);
     }
+
+    private void OnArDebugHudToggleChanged(object? sender, ToggledEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _viewModel.ApplyArDebugHudToggle(e.Value);
+    }
 }

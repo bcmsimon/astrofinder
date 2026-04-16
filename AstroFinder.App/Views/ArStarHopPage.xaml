@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             xmlns:camera="clr-namespace:CommunityToolkit.Maui.Views;assembly=CommunityToolkit.Maui.Camera"
+             xmlns:controls="clr-namespace:AstroFinder.App.Controls"
              x:Class="AstroFinder.App.Views.ArStarHopPage"
              Title="AR Stars"
              Shell.NavBarIsVisible="False"
@@ -9,10 +9,10 @@
 
     <Grid>
 
-        <!-- CAMERA PREVIEW LAYER -->
-        <camera:CameraView x:Name="CameraPreview"
-                           HorizontalOptions="Fill"
-                           VerticalOptions="Fill" />
+        <!-- CAMERA PREVIEW LAYER: ARCore camera background rendered by native GLSurfaceView -->
+        <controls:ArCameraView x:Name="ArCamera"
+                                HorizontalOptions="Fill"
+                                VerticalOptions="Fill" />
 
         <!-- Optional simulated night-vision filter -->
         <BoxView x:Name="NightFilterOverlay"
@@ -34,7 +34,7 @@
                   HorizontalOptions="Fill"
                   Padding="12,48,12,12"
                   RowDefinitions="Auto,Auto,Auto"
-                          ColumnDefinitions="Auto,*,Auto,Auto"
+                          ColumnDefinitions="Auto,*,Auto"
                           ColumnSpacing="8"
                           RowSpacing="6">
 
@@ -58,16 +58,6 @@
                     Clicked="OnNightModeClicked" />
 
             <Button Grid.Column="2"
-                    x:Name="ModeButton"
-                    Text="Sensor AR"
-                    BackgroundColor="#80000000"
-                    TextColor="White"
-                    FontSize="13"
-                    CornerRadius="10"
-                    Padding="12,8"
-                    Clicked="OnModeClicked" />
-
-            <Button Grid.Column="3"
                     Text="Calibrate"
                     BackgroundColor="#80000000"
                     TextColor="White"
@@ -91,12 +81,12 @@
                    Grid.ColumnSpan="4"
                    x:Name="DiagHudLabel"
                    Text=""
-                   TextColor="#B8FFFFFF"
-                   BackgroundColor="#60000000"
-                   FontSize="10"
+                   TextColor="#B8000000"
+                   BackgroundColor="#60FFFFFF"
+                   FontSize="9"
                    FontFamily="monospace"
                    LineBreakMode="WordWrap"
-                   MaxLines="6"
+                   MaxLines="14"
                    Padding="6,4"
                    HorizontalTextAlignment="Start"
                    VerticalTextAlignment="Start" />

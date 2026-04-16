@@ -1,3 +1,4 @@
+using AstroFinder.App.Controls;
 using AstroFinder.App.Services;
 using AstroFinder.App.ViewModels;
 using AstroFinder.App.Views;
@@ -7,6 +8,9 @@ using AstroApps.Maui.UIKit.Settings;
 using AstroApps.Maui.Theming;
 using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
+#if ANDROID
+using AstroFinder.App.Platforms.Android.Ar;
+#endif
 
 namespace AstroFinder.App;
 
@@ -20,7 +24,13 @@ public static class MauiProgram
             .UseAstroAppsDesignSystem()
             .UseAstroAppsMauiTheming()
             .UseMauiCommunityToolkit()
-            .UseMauiCommunityToolkitCamera();
+            .UseMauiCommunityToolkitCamera()
+            .ConfigureMauiHandlers(handlers =>
+            {
+#if ANDROID
+                handlers.AddHandler<ArCameraView, ArCameraViewHandler>();
+#endif
+            });
 
 #if DEBUG
         builder.Logging.AddDebug();
@@ -42,9 +52,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<FolderWatcherCaptureConfidenceService>();
 #if ANDROID
         builder.Services.AddSingleton<IArFrameSource, AndroidCameraFrameSource>();
-        // Android: use TYPE_GAME_ROTATION_VECTOR (gyro + accel, no magnetometer).
-        // Magnetometer noise causes heading jumps that make AR overlays teleport.
-        builder.Services.AddSingleton<IDeviceOrientationService, AndroidOrientationService>();
+        // Android: ARCore provides camera pose via visual-inertial odometry.
+        // Compass is read once at session start for absolute heading reference.
+        builder.Services.AddSingleton<ArCorePoseProvider>();
+        builder.Services.AddSingleton<IDeviceOrientationService>(sp => sp.GetRequiredService<ArCorePoseProvider>());
 #else
         builder.Services.AddSingleton<IArFrameSource, NullArFrameSource>();
         // iOS/macOS: MAUI OrientationSensor wraps CMAttitudeReferenceFrame.XArbitraryZVertical
