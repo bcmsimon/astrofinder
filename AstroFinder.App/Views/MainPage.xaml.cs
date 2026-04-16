@@ -14,7 +14,6 @@ public partial class MainPage : ContentPage
     private readonly ISharedSettingsPageService _settingsPageService;
     private readonly IDeviceOrientationService _deviceOrientationService;
     private readonly ObserverOrientationService _observerOrientationService;
-    private readonly IArFrameSource _arFrameSource;
     private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
 
     public MainPage(
@@ -23,7 +22,6 @@ public partial class MainPage : ContentPage
         ISharedSettingsPageService settingsPageService,
         IDeviceOrientationService deviceOrientationService,
         ObserverOrientationService observerOrientationService,
-        IArFrameSource arFrameSource,
         ManualGotoCalibrationService manualGotoCalibrationService)
     {
         _vm = viewModel;
@@ -31,7 +29,6 @@ public partial class MainPage : ContentPage
         _settingsPageService = settingsPageService;
         _deviceOrientationService = deviceOrientationService;
         _observerOrientationService = observerOrientationService;
-        _arFrameSource = arFrameSource;
         _manualGotoCalibrationService = manualGotoCalibrationService;
 
         // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
@@ -43,7 +40,7 @@ public partial class MainPage : ContentPage
         _vm.ShowStarMap += async data =>
         {
             await Navigation.PushModalAsync(
-                new StarMapPage(data, _deviceOrientationService, _observerOrientationService, _arFrameSource));
+                new StarMapPage(data, _deviceOrientationService, _observerOrientationService));
         };
 
         _vm.ShowDeltasFlyout += async data =>

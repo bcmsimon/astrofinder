@@ -1,4 +1,5 @@
 using AstroFinder.App.Services;
+using AstroFinder.App.ViewModels;
 using AstroFinder.Domain.AR;
 using AstroFinder.Domain.AR.Calibration;
 using AstroFinder.Engine.Geometry;
@@ -7,45 +8,41 @@ using AstroFinder.Engine.Primitives;
 namespace AstroFinder.App.Views;
 
 /// <summary>
-/// Displays a live sky overlay driven by a <see cref="PoseMatrix"/>-based sensor pipeline.
+/// Displays a live sky overlay driven by ARCore camera pose tracking.
+/// The hop map is rendered to a bitmap and placed as a textured quad
+/// in ARCore world space, so ARCore's own view/projection matrices
+/// handle all the world-lock tracking.
 /// </summary>
 public partial class ArStarHopPage : ContentPage
 {
     private readonly StarMapData _data;
     private readonly IDeviceOrientationService _orientationService;
     private readonly ObserverOrientationService _observerOrientationService;
-    private readonly IArFrameSource _arFrameSource;
     private readonly ArProjectionService _projectionService = new();
-    private readonly ArOverlayCalibrationPipeline _calibrationPipeline = new();
-    private readonly StarDetector _starDetector = new();
     private readonly ArOverlayDrawable _overlayDrawable = new();
-    private CancellationTokenSource? _cameraCts;
-    private CancellationTokenSource? _detectionLoopCts;
 
     private ArRouteInput? _routeInput;
     private CameraIntrinsics _intrinsics = CameraIntrinsics.Default;
     private bool _calibrationHintShown;
     private bool _isNightMode;
-    private bool _useCalibratedMode;
-    private IReadOnlyList<DetectedStarPoint> _latestDetections = [];
-    private readonly object _detectionsGate = new();
+    private bool _mapOverlaySet;
+    private float[]? _lastModelMatrix;
 
     public ArStarHopPage(
         StarMapData data,
         IDeviceOrientationService deviceOrientationService,
-        ObserverOrientationService observerOrientationService,
-        IArFrameSource arFrameSource)
+        ObserverOrientationService observerOrientationService)
     {
         _data = data;
         _orientationService = deviceOrientationService;
         _observerOrientationService = observerOrientationService;
-        _arFrameSource = arFrameSource;
 
         InitializeComponent();
 
         OverlayView.Drawable = _overlayDrawable;
         _overlayDrawable.SetNightMode(false);
-        UpdateModeButton();
+
+        ArCamera.StatusMessage += OnArStatusMessage;
     }
 
     // -------------------------------------------------------------------------
@@ -56,25 +53,22 @@ public partial class ArStarHopPage : ContentPage
     {
         base.OnAppearing();
 
-        _arFrameSource.Attach(CameraPreview);
-        _arFrameSource.SetActive(_useCalibratedMode);
-
-        WireWindowLifecycle();
+        DiagHudLabel.IsVisible = Preferences.Default.Get(SettingsPageViewModel.ShowArDebugHudKey, false);
 
         await ResolveRouteInputAsync();
+
+        ArCamera.ResumeSession();
 
         var sensorsStarted = await _orientationService.StartAsync();
         if (!sensorsStarted)
         {
-            ShowStatus("Compass sensor not available on this device.\nOverlay cannot be oriented.");
+            ShowStatus("AR tracking not available on this device.");
             return;
         }
 
         _orientationService.PoseChanged -= OnPoseChanged;
         _orientationService.PoseChanged += OnPoseChanged;
 
-        await RestartCameraPreviewIfAllowedAsync();
-        StartDetectionLoop();
         ShowCalibrationHint();
     }
 
@@ -82,69 +76,10 @@ public partial class ArStarHopPage : ContentPage
     {
         base.OnDisappearing();
 
-        UnwireWindowLifecycle();
         _orientationService.PoseChanged -= OnPoseChanged;
         _orientationService.Stop();
-        _arFrameSource.SetActive(false);
-        _arFrameSource.Detach();
-        StopCameraPreviewSafe();
-        StopDetectionLoop();
+        ArCamera.PauseSession();
     }
-
-    private async Task RestartCameraPreviewIfAllowedAsync()
-    {
-        StopCameraPreviewSafe();
-
-        var cameraPermission = await Permissions.CheckStatusAsync<Permissions.Camera>();
-        if (cameraPermission == PermissionStatus.Granted)
-        {
-            _cameraCts = new CancellationTokenSource();
-            _ = StartCameraAsync(_cameraCts.Token);
-        }
-    }
-
-    private async Task StartCameraAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            await CameraPreview.StartCameraPreview(cancellationToken);
-        }
-        catch (OperationCanceledException) { }
-        catch (Exception) { }
-    }
-
-    private void StopCameraPreviewSafe()
-    {
-        try
-        {
-            _cameraCts?.Cancel();
-            _cameraCts?.Dispose();
-            _cameraCts = null;
-            CameraPreview.StopCameraPreview();
-        }
-        catch (Exception) { }
-    }
-
-    private void WireWindowLifecycle()
-    {
-        if (Window is null) return;
-        Window.Stopped -= OnWindowStopped;
-        Window.Resumed -= OnWindowResumed;
-        Window.Stopped += OnWindowStopped;
-        Window.Resumed += OnWindowResumed;
-    }
-
-    private void UnwireWindowLifecycle()
-    {
-        if (Window is null) return;
-        Window.Stopped -= OnWindowStopped;
-        Window.Resumed -= OnWindowResumed;
-    }
-
-    private void OnWindowStopped(object? sender, EventArgs e) => StopCameraPreviewSafe();
-
-    private async void OnWindowResumed(object? sender, EventArgs e) =>
-        await RestartCameraPreviewIfAllowedAsync();
 
     protected override void OnSizeAllocated(double width, double height)
     {
@@ -160,93 +95,102 @@ public partial class ArStarHopPage : ContentPage
     // Sensor event
     // -------------------------------------------------------------------------
 
+    private string GetFullDiagnostics()
+    {
+#if ANDROID
+        if (_orientationService is AstroFinder.App.Platforms.Android.Ar.ArCorePoseProvider provider)
+        {
+            var d = provider.GetDiagnostics();
+            var pose = d.Raw4x4;
+            // ARCore pose = camera-to-world. translation is at [12], [13], [14] in column-major
+            var cpX = pose != null && pose.Length >= 16 ? pose[12] : 0f;
+            var cpY = pose != null && pose.Length >= 16 ? pose[13] : 0f;
+            var cpZ = pose != null && pose.Length >= 16 ? pose[14] : 0f;
+            
+            // Map matrix translation
+            var mpX = _lastModelMatrix != null && _lastModelMatrix.Length >= 16 ? _lastModelMatrix[12] : 0f;
+            var mpY = _lastModelMatrix != null && _lastModelMatrix.Length >= 16 ? _lastModelMatrix[13] : 0f;
+            var mpZ = _lastModelMatrix != null && _lastModelMatrix.Length >= 16 ? _lastModelMatrix[14] : 0f;
+
+            // Map matrix forward (from column 2)
+            var mfX = _lastModelMatrix != null && _lastModelMatrix.Length >= 16 ? _lastModelMatrix[8] : 0f;
+            var mfY = _lastModelMatrix != null && _lastModelMatrix.Length >= 16 ? _lastModelMatrix[9] : 0f;
+            var mfZ = _lastModelMatrix != null && _lastModelMatrix.Length >= 16 ? _lastModelMatrix[10] : 0f;
+
+            return $"Hdg: {d.HeadingDeg:F1}° (Locked: {provider.LockedHeadingRad.HasValue})\n" +
+                   $"DispPitch: {d.ArPitchDeg:F1}° SensPitch: {d.SensorPitchDeg:F1}°\n" +
+                   $"CamPos: ({cpX:F2}, {cpY:F2}, {cpZ:F2})\n" +
+                   $"MapPos: ({mpX:F2}, {mpY:F2}, {mpZ:F2})\n" +
+                   $"MapFwd: ({mfX:F2}, {mfY:F2}, {mfZ:F2})\n" +
+                   $"Map overlay: {(_mapOverlaySet ? "ON" : "waiting")}";
+        }
+#endif
+        return "";
+    }
+
     private void OnPoseChanged(object? sender, PoseMatrix pose)
     {
         if (_routeInput is null) return;
 
+        // --- Set up the bitmap map overlay on first tracking frame ---
+        TrySetMapOverlay();
+
+        // --- Lightweight diagnostics only (no per-frame projection) ---
         var liveInput = _routeInput with { ObservationTime = DateTimeOffset.Now };
-
         var frame = _projectionService.Project(liveInput, pose, _intrinsics);
-        CalibrationResult? calibration = null;
 
-        if (_useCalibratedMode)
-        {
-            IReadOnlyList<DetectedStarPoint> detections;
-            lock (_detectionsGate) { detections = _latestDetections; }
+        HeadingLabel.Text = $"{frame.TargetAngularDistanceDegrees:F0}\u00B0 to target";
 
-            calibration = _calibrationPipeline.Calibrate(frame, detections, out var corrected);
-            frame = corrected;
-        }
+        if (DiagHudLabel.IsVisible)
+            DiagHudLabel.Text = GetFullDiagnostics();
 
-        var headingText = $"{frame.TargetAngularDistanceDegrees:F0}\u00B0 to target";
-        if (calibration is not null)
-            headingText += $"  |  Cal {calibration.Confidence:0.00}";
-        HeadingLabel.Text = headingText;
-
-        // --- Diagnostics HUD ---
-        var t = frame.Target;
-        // Pose matrix rows: row0=right, row1=up, row2=forward (in ENU coords)
-        var right = new Vec3(pose.M[0], pose.M[1], pose.M[2]);
-        var up    = new Vec3(pose.M[3], pose.M[4], pose.M[5]);
-        var fwd   = new Vec3(pose.M[6], pose.M[7], pose.M[8]);
-        var camEnu = pose.Multiply(t.DirectionEnu);  // target in camera space
-
-        var visStars = frame.AsterismStars.Count(s => s.InFrontOfCamera && s.ScreenPoint.HasValue);
-        var visHops = frame.HopSteps.Count(s => s.InFrontOfCamera && s.ScreenPoint.HasValue);
-
-        var sp = t.ScreenPoint.HasValue ? $"{t.ScreenPoint.Value.XPx:F0},{t.ScreenPoint.Value.YPx:F0}" : "null";
-
-        DiagHudLabel.Text =
-            $"Tgt: alt={t.AltitudeDeg:F1} az={t.AzimuthDeg:F1} | scr={sp}\n" +
-            $"CamSpace: x={camEnu.X:F3} y={camEnu.Y:F3} z={camEnu.Z:F3}\n" +
-            $"Right(ENU): e={right.X:F2} n={right.Y:F2} u={right.Z:F2}\n" +
-            $"Up(ENU):    e={up.X:F2} n={up.Y:F2} u={up.Z:F2}\n" +
-            $"Fwd(ENU):   e={fwd.X:F2} n={fwd.Y:F2} u={fwd.Z:F2}\n" +
-            $"Vis: {visStars}/{frame.AsterismStars.Count} ast, {visHops}/{frame.HopSteps.Count} hop";
-
+        // Still update the old overlay for off-screen arrow guidance only.
         _overlayDrawable.Update(frame);
         OverlayView.Invalidate();
     }
 
-    private void StartDetectionLoop()
+    /// <summary>
+    /// Renders the hop map bitmap and places it in ARCore world space.
+    /// Called once when heading is locked and location is available.
+    /// </summary>
+    private void TrySetMapOverlay()
     {
-        StopDetectionLoop();
+        if (_mapOverlaySet || _routeInput is null) return;
 
-        _detectionLoopCts = new CancellationTokenSource();
-        var ct = _detectionLoopCts.Token;
+#if ANDROID
+        if (_orientationService is not AstroFinder.App.Platforms.Android.Ar.ArCorePoseProvider provider)
+            return;
 
-        _ = Task.Run(async () =>
+        var headingRad = provider.LockedHeadingRad;
+        if (!headingRad.HasValue) return; // not tracking yet
+
+        // Render the hop map to a bitmap.
+        var result = Platforms.Android.Ar.MapBitmapRenderer.Render(_data);
+
+        // Compute the model matrix placing the quad at the map center's sky position.
+        var modelMatrix = Platforms.Android.Ar.MapPlacement.ComputeModelMatrix(
+            result.CenterRaHours,
+            result.CenterDecDeg,
+            result.AngularWidthDeg,
+            _routeInput.ObserverLatitudeDegrees,
+            _routeInput.ObserverLongitudeDegrees,
+            headingRad.Value,
+            DateTimeOffset.UtcNow);
+
+        if (modelMatrix == null)
         {
-            while (!ct.IsCancellationRequested)
-            {
-                try
-                {
-                    if (_useCalibratedMode && _arFrameSource.TryGetLatestFrame(out var frame) && frame.Width > 0 && frame.Height > 0)
-                    {
-                        var detections = _starDetector.Detect(frame);
-                        lock (_detectionsGate) { _latestDetections = detections; }
-                    }
-                    else if (!_useCalibratedMode)
-                    {
-                        lock (_detectionsGate) { _latestDetections = []; }
-                    }
-                }
-                catch { }
-
-                await Task.Delay(TimeSpan.FromMilliseconds(350), ct).ConfigureAwait(false);
-            }
-        }, ct);
-    }
-
-    private void StopDetectionLoop()
-    {
-        try
-        {
-            _detectionLoopCts?.Cancel();
-            _detectionLoopCts?.Dispose();
-            _detectionLoopCts = null;
+            ShowStatus("Map center is below the horizon.");
+            return;
         }
-        catch { }
+
+        _lastModelMatrix = modelMatrix;
+
+        // Send the bitmap + placement to the AR camera view.
+        ArCamera.SetMapOverlay(result.Bitmap, modelMatrix, _isNightMode ? 0.55f : 0.80f);
+        _mapOverlaySet = true;
+        _overlayDrawable.IsMapOverlayActive = true;
+        System.Diagnostics.Debug.WriteLine($"[ArStarHopPage] Map overlay set: center RA={result.CenterRaHours:F2}h Dec={result.CenterDecDeg:F1}° width={result.AngularWidthDeg:F1}°");
+#endif
     }
 
     // -------------------------------------------------------------------------
@@ -325,6 +269,17 @@ public partial class ArStarHopPage : ContentPage
         });
     }
 
+    private void OnArStatusMessage(object? sender, string message)
+    {
+        ShowStatus(message);
+        if (message == "ARCore tracking: Tracking" && _mapOverlaySet)
+        {
+            // ARCore frequently drifts or changes its world coordinates when recovering from a Paused state.
+            // Recalibrate the compass and re-anchor the map to prevent wild jumps in position.
+            OnCalibrateClicked(this, EventArgs.Empty);
+        }
+    }
+
     // -------------------------------------------------------------------------
     // Button handlers
     // -------------------------------------------------------------------------
@@ -335,32 +290,20 @@ public partial class ArStarHopPage : ContentPage
     private void OnCalibrateClicked(object? sender, EventArgs e)
     {
         _orientationService.Recenter();
-        ShowStatus("Heading recalibrated.");
+        // Reset map overlay so it will be re-computed with new heading.
+        _mapOverlaySet = false;
+        _lastModelMatrix = null;
+        _overlayDrawable.IsMapOverlayActive = false;
+        ArCamera.ClearMapOverlay();
+        ShowStatus("Heading recalibrated from compass. Map will re-anchor.");
         Dispatcher.DispatchDelayed(TimeSpan.FromSeconds(3), () => StatusBanner.IsVisible = false);
-    }
-
-    private void OnModeClicked(object? sender, EventArgs e)
-    {
-        _useCalibratedMode = !_useCalibratedMode;
-        _arFrameSource.SetActive(_useCalibratedMode);
-        UpdateModeButton();
-
-        if (!_useCalibratedMode)
-        {
-            lock (_detectionsGate) { _latestDetections = []; }
-        }
-    }
-
-    private void UpdateModeButton()
-    {
-        ModeButton.Text = _useCalibratedMode ? "Cal AR" : "Sensor AR";
     }
 
     private void OnNightModeClicked(object? sender, EventArgs e)
     {
         _isNightMode = !_isNightMode;
         NightFilterOverlay.IsVisible = _isNightMode;
-        CameraPreview.Opacity = _isNightMode ? 0.24 : 1.0;
+        ArCamera.Opacity = _isNightMode ? 0.24 : 1.0;
         NightModeButton.Text = _isNightMode ? "Day AR" : "Night AR";
 
         _overlayDrawable.SetNightMode(_isNightMode);

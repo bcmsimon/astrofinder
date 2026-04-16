@@ -234,8 +234,8 @@ public partial class RaDecDeltaPage : ContentPage
         var decPositiveMove = data.DeltaDecDegrees >= 0;
         var raPositiveMove = sa2iDialHours >= 0;
 
-        var decKnobDirection = $"Turn the Dec fine-adjust {GetTurnDirection(decPositiveMove, _decPositiveClockwise)}.";
-        var settingsCircleDirection = $"Turn the settings circle {GetTurnDirection(raPositiveMove, _raPositiveClockwise)}.";
+        var decKnobDirection = $"Turn the Dec fine-adjust {GetTurnDirection(decPositiveMove, _decPositiveClockwise)} when looking at the knob.";
+        var settingsCircleDirection = $"Turn the settings circle {GetTurnDirection(raPositiveMove, _raPositiveClockwise)} when looking at the circle facing north.";
 
         var mountLabel = string.IsNullOrWhiteSpace(data.SelectedMountDisplayName)
             ? "Star Adventurer 2i"
@@ -248,31 +248,21 @@ public partial class RaDecDeltaPage : ContentPage
              $"2. Move the RA settings circle by {FormatSignedHours(sa2iDialHours)} on the date/time dial scale. {settingsCircleDirection}\n\n" +
              $"3. Current RA delta: {FormatSignedDegrees(data.DeltaRaDegrees)}. {raDirection}\n\n" +
              $"4. Current HA delta: {FormatSignedHours(deltaHaHours)}. HA is your RA-side move in mount time units (1.0h ≈ 15deg).\n\n" +
-             "Repeatable Manual GoTo Workflow (SA2i)\n\n" +
-             "1. Polar align first.\n" +
-             "Use the polar scope carefully. Accuracy here directly determines how well RA moves land.\n\n" +
-             "2. Pick a nearby bright reference star.\n" +
-             "Choose a star that is easy to center and close in RA/Dec to your target.\n\n" +
-             "3. Center the reference star.\n" +
-             "Use live view or a short exposure and center it as tightly as possible.\n\n" +
-             "4. Calibrate the RA circle.\n" +
-             "Look up the star RA and rotate only the RA setting circle to match it.\n\n" +
-             "5. Compute offsets to target.\n" +
-             "Use RA difference (h/m) and Dec difference (deg). Keep movements approximate.\n\n" +
-             "6. Move RA first.\n" +
-             "Unlock RA and rotate to target RA. Finish in the same direction each time to reduce backlash.\n\n" +
-             "7. Move Dec second.\n" +
-             "Adjust Dec by the required amount. This is often the larger correction.\n\n" +
-             "8. Take a short test exposure.\n" +
+             "Manual GoTo Workflow (SA2i)\n\n" +
+             "1. Move Dec by the amount shown above.\n" +
+             "Use the Dec fine-adjust knob. This is often the larger correction.\n\n" +
+             "2. Move the RA settings circle by the amount shown above.\n" +
+             "Finish in the same direction each time to reduce backlash.\n\n" +
+             "3. Take a short test exposure.\n" +
              "Use 2-5 seconds at high ISO. This acts as your real finder scope.\n\n" +
-             "9. Identify the field.\n" +
+             "4. Identify the field.\n" +
              "Compare star patterns in an app and look for bright stars, recognizable shapes, and faint fuzzies.\n\n" +
-             "10. Refine with small nudges.\n" +
+             "5. Refine with small nudges.\n" +
              "RA = left/right, Dec = up/down. Expect 1-3 iterations.\n\n" +
              "Practical Insights\n" +
              "- RA circles are coarse alignment tools: they get you in the neighborhood.\n" +
              "- Dec errors usually dominate: fix Dec first during refinement.\n" +
-             "- Fastest workflow is hybrid: RA circle -> star pattern check -> test exposure -> refine.\n" +
+             "- Fastest workflow is hybrid: move -> test exposure -> refine.\n" +
              "- Optional speed upgrade: red-dot finder, small guidescope, or plate solving.\n\n" +
              "Mental Model\n" +
              "Numbers get me close. Stars get me there.";

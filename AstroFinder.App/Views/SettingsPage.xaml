@@ -94,6 +94,33 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- AR debug HUD card -->
+                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                        Stroke="{DynamicResource ColorBorder}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 14"
+                        Padding="16">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Show AR debug HUD"
+                                   FontAttributes="Bold"
+                                   FontSize="15"
+                                   TextColor="{DynamicResource ColorTextPrimary}" />
+                            <Label Text="Shows a diagnostic overlay in the AR view with heading, pitch, and map overlay status."
+                                   FontSize="13"
+                                   TextColor="{DynamicResource ColorTextSecondary}"
+                                   LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+
+                        <Switch Grid.Column="1"
+                                x:Name="ArDebugHudToggle"
+                                IsToggled="{Binding ShowArDebugHud}"
+                                OnColor="{DynamicResource ColorPrimary}"
+                                Toggled="OnArDebugHudToggleChanged"
+                                VerticalOptions="Center" />
+                    </Grid>
+                </Border>
+
             </VerticalStackLayout>
         </ScrollView>
 

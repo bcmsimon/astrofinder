@@ -10,9 +10,12 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
     private readonly ArCameraService _arCameraService;
     private bool _useLocationOrientation;
     private bool _useArCamera;
+    private bool _showArDebugHud;
     private bool _isBusy;
     private string _statusText = "Location access is off. Star hop maps use a north-up chart.";
     private string _arStatusText = "AR sky view is off. Enable to use the live camera viewfinder.";
+
+    public const string ShowArDebugHudKey = "astrofinder.show-ar-debug-hud";
 
     public SettingsPageViewModel(
         ObserverOrientationService observerOrientationService,
@@ -79,6 +82,17 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool ShowArDebugHud
+    {
+        get => _showArDebugHud;
+        private set
+        {
+            if (_showArDebugHud == value) return;
+            _showArDebugHud = value;
+            OnPropertyChanged();
+        }
+    }
+
     public async Task InitializeAsync()
     {
         UseLocationOrientation = _observerOrientationService.IsLocationOrientationEnabled;
@@ -88,6 +102,8 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         UseArCamera = _arCameraService.IsArCameraEnabled;
         var arStatus = await _arCameraService.GetStatusAsync();
         ArStatusText = FormatArStatus(arStatus);
+
+        ShowArDebugHud = Preferences.Default.Get(ShowArDebugHudKey, false);
     }
 
     public async Task ApplyLocationToggleAsync(bool enabled)
@@ -110,6 +126,12 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         ArStatusText = FormatArStatus(status);
 
         IsBusy = false;
+    }
+
+    public void ApplyArDebugHudToggle(bool enabled)
+    {
+        Preferences.Default.Set(ShowArDebugHudKey, enabled);
+        ShowArDebugHud = enabled;
     }
 
     private static string FormatStatus(LocationOrientationStatus status) => status switch
