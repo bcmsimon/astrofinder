@@ -26,7 +26,9 @@ public partial class ArStarHopPage : ContentPage
     private bool _calibrationHintShown;
     private bool _isNightMode;
     private bool _mapOverlaySet;
+#if ANDROID
     private float[]? _lastModelMatrix;
+#endif
 
     public ArStarHopPage(
         StarMapData data,
@@ -292,7 +294,9 @@ public partial class ArStarHopPage : ContentPage
         _orientationService.Recenter();
         // Reset map overlay so it will be re-computed with new heading.
         _mapOverlaySet = false;
+#if ANDROID
         _lastModelMatrix = null;
+#endif
         _overlayDrawable.IsMapOverlayActive = false;
         ArCamera.ClearMapOverlay();
         ShowStatus("Heading recalibrated from compass. Map will re-anchor.");

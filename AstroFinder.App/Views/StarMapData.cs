@@ -53,5 +53,26 @@ public sealed class StarMapData
 
     public DateTimeOffset ObservationTime { get; init; } = DateTimeOffset.Now;
 
+    /// <summary>
+    /// When observer orientation is enabled, the map is rotated by this display angle in degrees.
+    /// This is typically either q or -q depending on screen-coordinate conventions.
+    /// </summary>
+    public double DisplayRotationDegrees { get; init; }
+
+    /// <summary>
+    /// Whether the display rotation should use -q instead of q.
+    /// </summary>
+    public bool InvertParallacticAngleForDisplay { get; init; } = true;
+
+    /// <summary>
+    /// Whether the target is above the local horizon for the supplied observer and time.
+    /// </summary>
+    public bool IsTargetAboveHorizon { get; init; } = true;
+
+    /// <summary>
+    /// Near the zenith the parallactic-angle interpretation becomes numerically sensitive.
+    /// </summary>
+    public bool IsNearZenithSensitive { get; init; }
+
     public string OrientationSummary { get; init; } = "North-up chart";
 }

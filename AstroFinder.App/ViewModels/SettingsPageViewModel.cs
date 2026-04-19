@@ -8,10 +8,13 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
 {
     private readonly ObserverOrientationService _observerOrientationService;
     private readonly ArCameraService _arCameraService;
+    private readonly MountSelectionService _mountSelectionService;
     private bool _useLocationOrientation;
+    private bool _invertParallacticAngleForDisplay;
     private bool _useArCamera;
     private bool _showArDebugHud;
     private bool _isBusy;
+    private string _selectedMountText = "No mount selected";
     private string _statusText = "Location access is off. Star hop maps use a north-up chart.";
     private string _arStatusText = "AR sky view is off. Enable to use the live camera viewfinder.";
 
@@ -19,10 +22,12 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
 
     public SettingsPageViewModel(
         ObserverOrientationService observerOrientationService,
-        ArCameraService arCameraService)
+        ArCameraService arCameraService,
+        MountSelectionService mountSelectionService)
     {
         _observerOrientationService = observerOrientationService;
         _arCameraService = arCameraService;
+        _mountSelectionService = mountSelectionService;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -45,6 +50,17 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         {
             if (_isBusy == value) return;
             _isBusy = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool InvertParallacticAngleForDisplay
+    {
+        get => _invertParallacticAngleForDisplay;
+        private set
+        {
+            if (_invertParallacticAngleForDisplay == value) return;
+            _invertParallacticAngleForDisplay = value;
             OnPropertyChanged();
         }
     }
@@ -82,6 +98,17 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         }
     }
 
+    public string SelectedMountText
+    {
+        get => _selectedMountText;
+        private set
+        {
+            if (_selectedMountText == value) return;
+            _selectedMountText = value;
+            OnPropertyChanged();
+        }
+    }
+
     public bool ShowArDebugHud
     {
         get => _showArDebugHud;
@@ -96,6 +123,7 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
     public async Task InitializeAsync()
     {
         UseLocationOrientation = _observerOrientationService.IsLocationOrientationEnabled;
+        InvertParallacticAngleForDisplay = _observerOrientationService.InvertParallacticAngleForDisplay;
         var status = await _observerOrientationService.GetStatusAsync();
         StatusText = FormatStatus(status);
 
@@ -103,7 +131,23 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         var arStatus = await _arCameraService.GetStatusAsync();
         ArStatusText = FormatArStatus(arStatus);
 
+        var selectedMount = await _mountSelectionService.GetSelectedMountNameAsync();
+        SelectedMountText = string.IsNullOrWhiteSpace(selectedMount)
+            ? "No mount selected"
+            : selectedMount;
+
         ShowArDebugHud = Preferences.Default.Get(ShowArDebugHudKey, false);
+    }
+
+    public Task<IReadOnlyList<string>> GetAvailableMountNamesAsync()
+    {
+        return _mountSelectionService.GetAvailableMountNamesAsync();
+    }
+
+    public async Task ApplySelectedMountAsync(string mountName)
+    {
+        await _mountSelectionService.SaveSelectedMountAsync(mountName);
+        SelectedMountText = mountName.Trim();
     }
 
     public async Task ApplyLocationToggleAsync(bool enabled)
@@ -115,6 +159,12 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         StatusText = FormatStatus(status);
 
         IsBusy = false;
+    }
+
+    public void ApplyInvertParallacticAngleToggle(bool enabled)
+    {
+        _observerOrientationService.SetInvertParallacticAngleForDisplay(enabled);
+        InvertParallacticAngleForDisplay = _observerOrientationService.InvertParallacticAngleForDisplay;
     }
 
     public async Task ApplyArCameraToggleAsync(bool enabled)
@@ -136,7 +186,7 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
 
     private static string FormatStatus(LocationOrientationStatus status) => status switch
     {
-        LocationOrientationStatus.Enabled => "Location enabled. Star hop maps will rotate to match your current sky.",
+        LocationOrientationStatus.Enabled => "Location enabled. Star hop maps will rotate to match your current sky using the configured display direction.",
         LocationOrientationStatus.PermissionDenied => "Location permission was denied. Star hop maps will stay north-up until you enable access.",
         LocationOrientationStatus.LocationUnavailable => "Location is enabled, but the current position could not be read. The app will fall back to a north-up chart.",
         _ => "Location access is off. Star hop maps use a north-up chart."

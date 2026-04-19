@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Input;
 using AstroFinder.App.Services;
 
@@ -5,6 +6,8 @@ namespace AstroFinder.App.Views;
 
 public partial class RaDecDeltaPage : ContentPage
 {
+    internal const double RaGraduationDialWrapHours = 12.0;
+
     private const string KamilChannelUrl = "https://www.youtube.com/@kamilkp";
     private const string AndreaChannelUrl = "https://www.youtube.com/@andreaminoia2002";
     private const string KamilVideoUrl = "https://www.youtube.com/watch?v=tNPIMKOB9k4&t=49s";
@@ -36,9 +39,11 @@ public partial class RaDecDeltaPage : ContentPage
         TitleLabel.Text = data.Title;
         ActiveMountLabel.Text = BuildActiveMountText(data.SelectedMountDisplayName);
         DetailsLabel.Text = _baseDetails;
-        ModeHeader.Title = "Delta Summary";
         ManualGotoUIKitButton.IsEnabled = data.IsManualGotoEnabled;
         UpdateCalibrationStatus();
+        UpdateModeHeader();
+        UpdateCalculatorVisibility();
+        UpdateRaGraduationCalculator();
     }
 
     public ICommand CloseCommand { get; }
@@ -72,18 +77,25 @@ public partial class RaDecDeltaPage : ContentPage
             DetailsLabel.Text = BuildManualGotoInstructions();
             DetailsLabel.FormattedText = null;
             AboutLinkRows.IsVisible = false;
-            ModeHeader.Title = "Manual Goto";
             ManualGotoUIKitButton.Text = "Show Summary";
-            AboutManualGotoButton.Text = "About Manual Goto";
+            AboutManualGotoButton.Text = "About Manual";
+            UpdateModeHeader();
+            UpdateCalculatorVisibility();
             return;
         }
 
         DetailsLabel.Text = _baseDetails;
         DetailsLabel.FormattedText = null;
         AboutLinkRows.IsVisible = false;
-        ModeHeader.Title = "Delta Summary";
         ManualGotoUIKitButton.Text = "Manual Goto";
-        AboutManualGotoButton.Text = "About Manual Goto";
+        AboutManualGotoButton.Text = "About Manual";
+        UpdateModeHeader();
+        UpdateCalculatorVisibility();
+    }
+
+    private void OnCurrentRaGraduationChanged(object? sender, TextChangedEventArgs e)
+    {
+        UpdateRaGraduationCalculator();
     }
 
     private void ToggleAboutManualGoto()
@@ -96,18 +108,20 @@ public partial class RaDecDeltaPage : ContentPage
             DetailsLabel.Text = BuildManualGotoAboutText();
             DetailsLabel.FormattedText = null;
             AboutLinkRows.IsVisible = true;
-            ModeHeader.Title = "About Manual Goto";
             ManualGotoUIKitButton.Text = "Manual Goto";
             AboutManualGotoButton.Text = "Show Summary";
+            UpdateModeHeader();
+            UpdateCalculatorVisibility();
             return;
         }
 
         DetailsLabel.Text = _baseDetails;
         DetailsLabel.FormattedText = null;
         AboutLinkRows.IsVisible = false;
-        ModeHeader.Title = "Delta Summary";
         ManualGotoUIKitButton.Text = "Manual Goto";
-        AboutManualGotoButton.Text = "About Manual Goto";
+        AboutManualGotoButton.Text = "About Manual";
+        UpdateModeHeader();
+        UpdateCalculatorVisibility();
     }
 
     private static string BuildManualGotoAboutText() =>
@@ -216,12 +230,72 @@ public partial class RaDecDeltaPage : ContentPage
             : $"Direction calibration ({mountLabel}): not set (using default assumptions)";
     }
 
+    private void UpdateCalculatorVisibility()
+    {
+        RaGraduationCalculatorCard.IsVisible =
+            _data.IsManualGotoEnabled &&
+            !_isManualGotoMode &&
+            !_isAboutMode;
+    }
+
+    private void UpdateModeHeader()
+    {
+        if (_isManualGotoMode)
+        {
+            ModeHeader.Title = "Manual Goto";
+            ModeHeader.IsVisible = true;
+            return;
+        }
+
+        if (_isAboutMode)
+        {
+            ModeHeader.Title = "About Manual Goto";
+            ModeHeader.IsVisible = true;
+            return;
+        }
+
+        ModeHeader.Title = string.Empty;
+        ModeHeader.IsVisible = false;
+    }
+
+    private void UpdateRaGraduationCalculator()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentRaGraduationEntry.Text))
+        {
+            TargetRaGraduationLabel.Text = "-";
+            RaGraduationDeltaLabel.Text = string.Empty;
+            RaGraduationDeltaLabel.IsVisible = false;
+            RaGraduationStatusLabel.Text = string.Empty;
+            RaGraduationErrorLabel.IsVisible = false;
+            return;
+        }
+
+        if (!TryParseGraduation(CurrentRaGraduationEntry.Text, out var currentGraduation))
+        {
+            TargetRaGraduationLabel.Text = "-";
+            RaGraduationDeltaLabel.Text = string.Empty;
+            RaGraduationDeltaLabel.IsVisible = false;
+            RaGraduationStatusLabel.Text = "";
+            RaGraduationErrorLabel.Text = "Enter a numeric graduation value, for example 4.2.";
+            RaGraduationErrorLabel.IsVisible = true;
+            return;
+        }
+
+        var dialDeltaHours = CalculateRaDialDeltaHours(_data.DeltaRaDegrees);
+        var targetGraduation = CalculateTargetRaGraduation(currentGraduation, _data.DeltaRaDegrees);
+        TargetRaGraduationLabel.Text = $"{targetGraduation:F1}h";
+        RaGraduationDeltaLabel.Text = $"RA dial move: {FormatSignedHours(dialDeltaHours)}";
+        RaGraduationDeltaLabel.IsVisible = true;
+        RaGraduationStatusLabel.Text = $"Starting at {NormalizeRaGraduation(currentGraduation):F1}h, turn the dial to {targetGraduation:F1}h.";
+        RaGraduationErrorLabel.IsVisible = false;
+    }
+
     private string BuildManualGotoInstructions()
     {
         var data = _data;
         var deltaHaDegrees = -data.DeltaRaDegrees;
         var deltaHaHours = deltaHaDegrees / 15.0;
-        var sa2iDialHours = deltaHaHours / 2.0;
+        var raDialHours = deltaHaHours;
 
         var raDirection = data.DeltaRaDegrees >= 0
             ? "Target is east in RA (+RA)."
@@ -232,7 +306,7 @@ public partial class RaDecDeltaPage : ContentPage
             : "Target is south in Dec (-Dec).";
 
         var decPositiveMove = data.DeltaDecDegrees >= 0;
-        var raPositiveMove = sa2iDialHours >= 0;
+        var raPositiveMove = raDialHours >= 0;
 
         var decKnobDirection = $"Turn the Dec fine-adjust {GetTurnDirection(decPositiveMove, _decPositiveClockwise)} when looking at the knob.";
         var settingsCircleDirection = $"Turn the settings circle {GetTurnDirection(raPositiveMove, _raPositiveClockwise)} when looking at the circle facing north.";
@@ -245,9 +319,9 @@ public partial class RaDecDeltaPage : ContentPage
              $"Mount: {mountLabel}\n" +
              $"Reference -> target: {data.ReferenceStarName} -> {data.TargetName}\n\n" +
              $"1. Move Dec by {FormatSignedDegrees(data.DeltaDecDegrees)}. {decDirection} {decKnobDirection}\n\n" +
-             $"2. Move the RA settings circle by {FormatSignedHours(sa2iDialHours)} on the date/time dial scale. {settingsCircleDirection}\n\n" +
+             $"2. Move the RA settings circle by {FormatSignedHours(raDialHours)} on the date/time dial scale. {settingsCircleDirection}\n\n" +
              $"3. Current RA delta: {FormatSignedDegrees(data.DeltaRaDegrees)}. {raDirection}\n\n" +
-             $"4. Current HA delta: {FormatSignedHours(deltaHaHours)}. HA is your RA-side move in mount time units (1.0h ≈ 15deg).\n\n" +
+             $"4. Current HA delta: {FormatSignedHours(deltaHaHours)}. HA is the same RA-side move in mount time units (1.0h ≈ 15deg).\n\n" +
              "Manual GoTo Workflow (SA2i)\n\n" +
              "1. Move Dec by the amount shown above.\n" +
              "Use the Dec fine-adjust knob. This is often the larger correction.\n\n" +
@@ -271,6 +345,33 @@ public partial class RaDecDeltaPage : ContentPage
     private static string GetTurnDirection(bool positiveMove, bool positiveMoveIsClockwise)
     {
         return positiveMove == positiveMoveIsClockwise ? "clockwise" : "anti-clockwise";
+    }
+
+    internal static double CalculateRaDialDeltaHours(double deltaRaDegrees)
+    {
+        return -deltaRaDegrees / 15.0;
+    }
+
+    internal static double CalculateTargetRaGraduation(double currentGraduation, double deltaRaDegrees)
+    {
+        return NormalizeRaGraduation(currentGraduation + CalculateRaDialDeltaHours(deltaRaDegrees));
+    }
+
+    internal static double NormalizeRaGraduation(double graduationHours)
+    {
+        var normalized = graduationHours % RaGraduationDialWrapHours;
+        return normalized < 0 ? normalized + RaGraduationDialWrapHours : normalized;
+    }
+
+    internal static bool TryParseGraduation(string? text, out double value)
+    {
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value))
+        {
+            return true;
+        }
+
+        var normalizedText = text?.Trim().Replace(',', '.');
+        return double.TryParse(normalizedText, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
     }
 
     private static string FormatSignedDegrees(double degrees) =>

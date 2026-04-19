@@ -19,8 +19,11 @@ public sealed record ObserverOrientationContext(
 public sealed class ObserverOrientationService
 {
     private const string UseLocationKey = "astrofinder.use-location-orientation";
+    private const string InvertParallacticAngleKey = "astrofinder.invert-parallactic-angle-for-display";
 
     public bool IsLocationOrientationEnabled => Preferences.Default.Get(UseLocationKey, false);
+
+    public bool InvertParallacticAngleForDisplay => Preferences.Default.Get(InvertParallacticAngleKey, true);
 
     public async Task<LocationOrientationStatus> SetLocationOrientationEnabledAsync(bool enabled)
     {
@@ -44,6 +47,11 @@ public sealed class ObserverOrientationService
 
         Preferences.Default.Set(UseLocationKey, false);
         return LocationOrientationStatus.PermissionDenied;
+    }
+
+    public void SetInvertParallacticAngleForDisplay(bool enabled)
+    {
+        Preferences.Default.Set(InvertParallacticAngleKey, enabled);
     }
 
     public async Task<LocationOrientationStatus> GetStatusAsync()
