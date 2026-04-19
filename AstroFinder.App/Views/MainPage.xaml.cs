@@ -15,6 +15,7 @@ public partial class MainPage : ContentPage
     private readonly IDeviceOrientationService _deviceOrientationService;
     private readonly ObserverOrientationService _observerOrientationService;
     private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
+    private readonly MountSelectionService _mountSelectionService;
 
     public MainPage(
         MainPageViewModel viewModel,
@@ -22,7 +23,8 @@ public partial class MainPage : ContentPage
         ISharedSettingsPageService settingsPageService,
         IDeviceOrientationService deviceOrientationService,
         ObserverOrientationService observerOrientationService,
-        ManualGotoCalibrationService manualGotoCalibrationService)
+        ManualGotoCalibrationService manualGotoCalibrationService,
+        MountSelectionService mountSelectionService)
     {
         _vm = viewModel;
         _settingsBootstrapper = settingsBootstrapper;
@@ -30,6 +32,7 @@ public partial class MainPage : ContentPage
         _deviceOrientationService = deviceOrientationService;
         _observerOrientationService = observerOrientationService;
         _manualGotoCalibrationService = manualGotoCalibrationService;
+        _mountSelectionService = mountSelectionService;
 
         // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
         OpenSettingsCommand = new Command(async () => await OpenSettingsAsync());
@@ -76,6 +79,44 @@ public partial class MainPage : ContentPage
         base.OnAppearing();
         _settingsBootstrapper.EnsureRegistered();
         await _vm.LoadCatalogsAsync();
+        await EnsureMountSelectionAsync();
+        _vm.RefreshMountSelection();
+    }
+
+    private async Task EnsureMountSelectionAsync()
+    {
+        var selectedMount = await _mountSelectionService.GetSelectedMountNameAsync();
+        if (!string.IsNullOrWhiteSpace(selectedMount))
+        {
+            return;
+        }
+
+        var options = await _mountSelectionService.GetAvailableMountNamesAsync();
+        if (options.Count == 0)
+        {
+            await DisplayAlert(
+                "Mount required",
+                "No mount profiles are available yet. Open Settings and choose a mount before using RA/Dec guidance.",
+                "OK");
+            return;
+        }
+
+        var choice = await DisplayActionSheet(
+            "Select mount",
+            "Settings",
+            null,
+            options.ToArray());
+
+        if (string.Equals(choice, "Settings", StringComparison.Ordinal))
+        {
+            await OpenSettingsAsync();
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(choice))
+        {
+            await _mountSelectionService.SaveSelectedMountAsync(choice);
+        }
     }
 
     private void OnTargetSearchTextChanged(object? sender, TextChangedEventArgs e)

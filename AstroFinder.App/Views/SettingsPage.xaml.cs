@@ -42,6 +42,16 @@ public partial class SettingsPage : ContentPage
         await _viewModel.ApplyArCameraToggleAsync(e.Value);
     }
 
+    private void OnParallacticDirectionToggleChanged(object? sender, ToggledEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _viewModel.ApplyInvertParallacticAngleToggle(e.Value);
+    }
+
     private void OnArDebugHudToggleChanged(object? sender, ToggledEventArgs e)
     {
         if (_isInitializing)
@@ -50,5 +60,28 @@ public partial class SettingsPage : ContentPage
         }
 
         _viewModel.ApplyArDebugHudToggle(e.Value);
+    }
+
+    private async void OnSelectMountClicked(object? sender, EventArgs e)
+    {
+        var options = await _viewModel.GetAvailableMountNamesAsync();
+        if (options.Count == 0)
+        {
+            await DisplayAlert("Mounts", "No mount profiles are available to select.", "OK");
+            return;
+        }
+
+        var choice = await DisplayActionSheet(
+            "Select mount",
+            "Cancel",
+            null,
+            options.ToArray());
+
+        if (string.IsNullOrWhiteSpace(choice) || string.Equals(choice, "Cancel", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await _viewModel.ApplySelectedMountAsync(choice);
     }
 }

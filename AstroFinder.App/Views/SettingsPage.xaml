@@ -28,6 +28,33 @@
                         StrokeThickness="1"
                         StrokeShape="RoundRectangle 14"
                         Padding="16">
+                      <VerticalStackLayout Spacing="12">
+                       <Label Text="Mount selection"
+                           FontAttributes="Bold"
+                           FontSize="15"
+                           TextColor="{DynamicResource ColorTextPrimary}" />
+
+                       <Label Text="Choose the mount AstroFinder should use for RA/Dec guidance and Manual Goto. This selection is persisted and reused on launch."
+                           FontSize="13"
+                           TextColor="{DynamicResource ColorTextSecondary}"
+                           LineBreakMode="WordWrap" />
+
+                       <Label Text="{Binding SelectedMountText}"
+                           FontSize="13"
+                           TextColor="{DynamicResource ColorTextPrimary}" />
+
+                       <Button Text="Select mount"
+                            BackgroundColor="{DynamicResource ColorPrimary}"
+                            TextColor="{DynamicResource ColorTextInverse}"
+                            Clicked="OnSelectMountClicked" />
+                      </VerticalStackLayout>
+                  </Border>
+
+                  <Border BackgroundColor="{DynamicResource ColorSurface}"
+                       Stroke="{DynamicResource ColorBorder}"
+                       StrokeThickness="1"
+                       StrokeShape="RoundRectangle 14"
+                       Padding="16">
                     <VerticalStackLayout Spacing="12">
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                             <VerticalStackLayout Spacing="4">
@@ -58,6 +85,32 @@
                                TextColor="{DynamicResource ColorTextSecondary}"
                                LineBreakMode="WordWrap" />
                     </VerticalStackLayout>
+                </Border>
+
+                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                        Stroke="{DynamicResource ColorBorder}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 14"
+                        Padding="16">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                        <VerticalStackLayout Spacing="4">
+                            <Label Text="Flip sky-map rotation direction"
+                                   FontAttributes="Bold"
+                                   FontSize="15"
+                                   TextColor="{DynamicResource ColorTextPrimary}" />
+                            <Label Text="Use this if the sky-oriented star hop map appears mirrored or rotates opposite to the real sky. On = use -q. Off = use q."
+                                   FontSize="13"
+                                   TextColor="{DynamicResource ColorTextSecondary}"
+                                   LineBreakMode="WordWrap" />
+                        </VerticalStackLayout>
+
+                        <Switch Grid.Column="1"
+                                x:Name="ParallacticDirectionToggle"
+                                IsToggled="{Binding InvertParallacticAngleForDisplay}"
+                                OnColor="{DynamicResource ColorPrimary}"
+                                Toggled="OnParallacticDirectionToggleChanged"
+                                VerticalOptions="Center" />
+                    </Grid>
                 </Border>
 
                 <!-- AR camera card -->

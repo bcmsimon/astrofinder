@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text;
+using AstroFinder.Engine.Geometry;
+using AstroFinder.Engine.Primitives;
 using Microsoft.Maui.Graphics;
 
 namespace AstroFinder.App.Views;
@@ -99,14 +101,27 @@ internal static class StarMapHtmlBuilder
             Math.Max(0, plotRect.Width - (2 * PlotInset)),
             Math.Max(0, plotRect.Height - (2 * PlotInset)));
 
-        // Always use equatorial (RA/Dec) coordinates for the 2D star map projection.
-        // Alt/Az coordinates cause severe distortion near the zenith: when a circumpolar
-        // asterism like the Big Dipper is at 80°+ altitude (typical at mid-northern
-        // latitudes in spring), a tiny RA difference becomes a huge azimuth span
-        // (÷cos(alt)), making the asterism shape unrecognisable.
-        // The live AR view handles sky-matched orientation separately.
+        // Keep the star map in equatorial chart space and rotate that chart by the
+        // already-computed display angle. This preserves star geometry better than
+        // drawing directly in horizontal coordinates.
         (double LonDeg, double LatDeg) ToProjectionCoordinates(double raHours, double decDegrees)
             => (raHours * 15.0, decDegrees);
+
+        var displayRotationRadians = data.UseObserverOrientation
+            ? SkyOrientationService.DegreesToRadians(data.DisplayRotationDegrees)
+            : 0.0;
+
+        (double x, double y) ProjectForDisplay(double lonDegrees, double latDegrees, double chartCenterLonDeg, double chartCenterLatDeg)
+        {
+            var (x, y) = Project(lonDegrees, latDegrees, chartCenterLonDeg, chartCenterLatDeg);
+            if (!data.UseObserverOrientation)
+            {
+                return (x, y);
+            }
+
+            var rotated = SkyOrientationService.RotatePoint(new PointD(x, y), displayRotationRadians);
+            return (rotated.X, rotated.Y);
+        }
 
         var allPoints = new List<(double lon, double lat)>
         {
@@ -127,7 +142,7 @@ internal static class StarMapHtmlBuilder
         var centerLatDeg = allPoints.Average(p => p.lat);
 
         var projected = allPoints
-            .Select(p => Project(p.lon, p.lat, centerLonDeg, centerLatDeg))
+            .Select(p => ProjectForDisplay(p.lon, p.lat, centerLonDeg, centerLatDeg))
             .ToList();
 
         double minX = projected.Min(p => p.x);
@@ -152,7 +167,7 @@ internal static class StarMapHtmlBuilder
 
         PointF ToCanvasProjected(double lonDegrees, double latDegrees)
         {
-            var (px, py) = Project(lonDegrees, latDegrees, centerLonDeg, centerLatDeg);
+            var (px, py) = ProjectForDisplay(lonDegrees, latDegrees, centerLonDeg, centerLatDeg);
             var x = usableRect.Left + centeredOffsetX + (float)((maxX - px) * scale);
             var y = usableRect.Top + centeredOffsetY + (float)((maxY - py) * scale);
             return new PointF(x, y);
@@ -302,9 +317,16 @@ internal static class StarMapHtmlBuilder
         sb.Append("</g>");
 
         sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + 22:F1}' fill='{ToCss(textSecondary)}' font-size='22'>via {WebUtility.HtmlEncode(data.AsterismName)}</text>");
-        sb.Append($"<text x='{plotRect.Left + (plotRect.Width / 2f):F1}' y='{plotRect.Top + 22:F1}' fill='{ToCss(textSecondary)}' font-size='22' text-anchor='middle'>N</text>");
-        sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='{ToCss(textSecondary)}' font-size='22'>E</text>");
-        sb.Append($"<text x='{plotRect.Right - 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='{ToCss(textSecondary)}' font-size='22' text-anchor='end'>W</text>");
+        if (data.UseObserverOrientation)
+        {
+            AppendNorthPointer(sb, plotRect, textSecondary, accent, displayRotationRadians, data.IsTargetAboveHorizon);
+        }
+        else
+        {
+            sb.Append($"<text x='{plotRect.Left + (plotRect.Width / 2f):F1}' y='{plotRect.Top + 22:F1}' fill='{ToCss(textSecondary)}' font-size='22' text-anchor='middle'>N</text>");
+            sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='{ToCss(textSecondary)}' font-size='22'>E</text>");
+            sb.Append($"<text x='{plotRect.Right - 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='{ToCss(textSecondary)}' font-size='22' text-anchor='end'>W</text>");
+        }
 
         var placedLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         AppendLabel(sb, usableRect, occupiedAreas, targetPoint, data.Target.Label, error, plotBackground, centerPoint, 28f, targetSize + 4f, placedLabels);
@@ -327,6 +349,50 @@ internal static class StarMapHtmlBuilder
 
         sb.Append("</svg>");
         return sb.ToString();
+    }
+
+    private static void AppendNorthPointer(
+        StringBuilder sb,
+        RectF plotRect,
+        Color textColor,
+        Color accent,
+        double displayRotationRadians,
+        bool isTargetAboveHorizon)
+    {
+        var northDirection = SkyOrientationService.RotatePoint(new PointD(0.0, 1.0), displayRotationRadians);
+        var screenVector = new PointD(-northDirection.X, -northDirection.Y);
+        var pointerCenter = new PointF(plotRect.Right - 96f, plotRect.Top + 114f);
+        var perpendicular = new PointD(-screenVector.Y, screenVector.X);
+
+        const float tipLength = 62f;
+        const float tailLength = 30f;
+        const float wingOffset = 18f;
+        const float wingPullback = 8f;
+
+        var tip = new PointF(
+            pointerCenter.X + (float)(screenVector.X * tipLength),
+            pointerCenter.Y + (float)(screenVector.Y * tipLength));
+        var tail = new PointF(
+            pointerCenter.X - (float)(screenVector.X * tailLength),
+            pointerCenter.Y - (float)(screenVector.Y * tailLength));
+        var leftWing = new PointF(
+            pointerCenter.X - (float)(perpendicular.X * wingOffset) - (float)(screenVector.X * wingPullback),
+            pointerCenter.Y - (float)(perpendicular.Y * wingOffset) - (float)(screenVector.Y * wingPullback));
+        var rightWing = new PointF(
+            pointerCenter.X + (float)(perpendicular.X * wingOffset) - (float)(screenVector.X * wingPullback),
+            pointerCenter.Y + (float)(perpendicular.Y * wingOffset) - (float)(screenVector.Y * wingPullback));
+
+        sb.Append("<g id='north-pointer'>");
+        sb.Append($"<polygon points='{tip.X:F1},{tip.Y:F1} {leftWing.X:F1},{leftWing.Y:F1} {tail.X:F1},{tail.Y:F1}' fill='#FFFFFF' stroke='{ToCss(accent)}' stroke-width='4' stroke-linejoin='round' />");
+        sb.Append($"<polygon points='{tip.X:F1},{tip.Y:F1} {rightWing.X:F1},{rightWing.Y:F1} {tail.X:F1},{tail.Y:F1}' fill='{ToCss(accent)}' stroke='{ToCss(accent)}' stroke-width='4' stroke-linejoin='round' />");
+        sb.Append($"<text x='{tip.X:F1}' y='{(tip.Y - 14f):F1}' fill='{ToCss(textColor)}' font-size='28' font-weight='700' text-anchor='middle'>N</text>");
+
+        if (!isTargetAboveHorizon)
+        {
+            sb.Append($"<text x='{pointerCenter.X:F1}' y='{(pointerCenter.Y + 58f):F1}' fill='{ToCss(textColor)}' font-size='16' text-anchor='middle'>Target below horizon</text>");
+        }
+
+        sb.Append("</g>");
     }
 
     private static void AppendLabel(

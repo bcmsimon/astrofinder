@@ -58,7 +58,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         _manualGotoCalibrationService = manualGotoCalibrationService;
 
         BuildMapCommand = new Command(async () => await BuildStarHopMapAsync(), () => _selectedTarget is not null);
-        ShowDeltasCommand = new Command(ShowDeltas, () => _selectedTarget is not null && _selectedStar is not null);
+        ShowDeltasCommand = new Command(ShowDeltas, () => _selectedTarget is not null && _selectedStar is not null && HasSelectedMount());
         ClearTargetCommand = new Command(ClearTarget);
         ClearStarCommand = new Command(ClearStar);
     }
@@ -224,6 +224,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     public ICommand ShowDeltasCommand { get; }
     public ICommand ClearTargetCommand { get; }
     public ICommand ClearStarCommand { get; }
+
+    public void RefreshMountSelection()
+    {
+        ((Command)ShowDeltasCommand).ChangeCanExecute();
+    }
 
     public async Task LoadCatalogsAsync()
     {
@@ -735,8 +740,19 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             .Select(x => new StarMapPoint(x.Star.RightAscensionHours, x.Star.DeclinationDeg, x.Star.VisualMagnitude, null))
             .ToList();
 
-        var orientationSummary = observerContext is not null
-            ? $"Sky-oriented • {FormatLatitude(observerContext.LatitudeDegrees)}, {FormatLongitude(observerContext.LongitudeDegrees)} • {observerContext.ObservationTime.LocalDateTime:HH:mm}"
+        var invertParallacticAngleForDisplay = _observerOrientationService.InvertParallacticAngleForDisplay;
+        SkyOrientationResult? orientation = null;
+        if (observerContext is not null)
+        {
+            orientation = SkyOrientationService.GetChartOrientation(
+                new ObserverLocation(observerContext.LatitudeDegrees, observerContext.LongitudeDegrees),
+                observerContext.ObservationTime.UtcDateTime,
+                targetCoord,
+                invertParallacticAngleForDisplay);
+        }
+
+        var orientationSummary = orientation is not null
+            ? BuildOrientationSummary(observerContext!, orientation.Value, invertParallacticAngleForDisplay)
             : useObserverOrientationRequested
                 ? "North-up chart • location unavailable"
                 : "North-up chart";
@@ -760,8 +776,30 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             ObserverLatitudeDeg = observerContext?.LatitudeDegrees,
             ObserverLongitudeDeg = observerContext?.LongitudeDegrees,
             ObservationTime = observerContext?.ObservationTime ?? DateTimeOffset.Now,
+            DisplayRotationDegrees = orientation?.DisplayRotationDegrees ?? 0.0,
+            InvertParallacticAngleForDisplay = invertParallacticAngleForDisplay,
+            IsTargetAboveHorizon = orientation?.IsAboveHorizon ?? true,
+            IsNearZenithSensitive = orientation?.IsNearZenithSensitive ?? false,
             OrientationSummary = orientationSummary
         };
+    }
+
+    private static string BuildOrientationSummary(
+        ObserverOrientationContext observerContext,
+        SkyOrientationResult orientation,
+        bool invertParallacticAngleForDisplay)
+    {
+        var horizonSummary = orientation.IsAboveHorizon
+            ? $"alt {orientation.AltitudeDegrees:F1}°"
+            : $"below horizon ({orientation.AltitudeDegrees:F1}°)";
+
+        var zenithSummary = orientation.IsNearZenithSensitive
+            ? " • near zenith: rotation can change quickly"
+            : string.Empty;
+
+        var signSummary = invertParallacticAngleForDisplay ? " • -q" : " • q";
+
+        return $"Sky-oriented • rot {orientation.DisplayRotationDegrees:F1}°{signSummary} • q {orientation.ParallacticAngleDegrees:F1}° • {horizonSummary} • {FormatLatitude(observerContext.LatitudeDegrees)}, {FormatLongitude(observerContext.LongitudeDegrees)} • {observerContext.ObservationTime.LocalDateTime:HH:mm}{zenithSummary}";
     }
 
     private void ShowDeltas()
@@ -781,8 +819,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
                         $"ΔHA (RA move): {FormatSignedHours(deltaHaHours)}\n" +
                         "HA is the RA-side move in mount time units (1.0h ≈ 15°).\n\n" +
                         $"Separation: {rel.AngularSeparationDegrees:F2}°\n" +
-                        $"Position angle: {rel.PositionAngleDegrees:F1}° (N through E)\n\n" +
-                        "Tip: Use Manual Goto for step-by-step mount moves.";
+                        $"Position angle: {rel.PositionAngleDegrees:F1}° (N through E)";
 
         ResultText = deltaText;
         HasResult = true;
@@ -804,6 +841,9 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         // profiles are available and mount-specific gating can be enforced.
         return true;
     }
+
+    private bool HasSelectedMount() =>
+        !string.IsNullOrWhiteSpace(_manualGotoCalibrationService.GetSelectedMountName());
 
     private static string FormatRa(double hours)
     {

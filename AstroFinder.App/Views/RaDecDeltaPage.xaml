@@ -55,6 +55,75 @@
                                TextColor="{DynamicResource ColorTextPrimary}"
                                LineBreakMode="WordWrap" />
 
+                           <Border x:Name="RaGraduationCalculatorCard"
+                                BackgroundColor="{DynamicResource ColorSurfaceAlt}"
+                                Stroke="{DynamicResource ColorBorder}"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="12,10">
+                            <VerticalStackLayout Spacing="8">
+                                <Label Text="RA Date/Time Graduation Calculator"
+                                    FontSize="13"
+                                    FontAttributes="Bold"
+                                    TextColor="{DynamicResource ColorTextPrimary}" />
+
+                                <Label Text="Enter the current value on the RA date/time graduation. The app will calculate the value to turn it to on the 12-hour dial."
+                                    FontSize="12"
+                                    TextColor="{DynamicResource ColorTextSecondary}"
+                                    LineBreakMode="WordWrap" />
+
+                                <Grid ColumnDefinitions="*,*"
+                                   ColumnSpacing="12"
+                                   RowDefinitions="Auto,Auto">
+                                 <VerticalStackLayout Spacing="4">
+                                     <Label Text="Current graduation"
+                                         FontSize="12"
+                                         TextColor="{DynamicResource ColorTextSecondary}" />
+                                     <Border BackgroundColor="{DynamicResource ColorSurface}"
+                                          Stroke="{DynamicResource ColorBorder}"
+                                          StrokeThickness="1"
+                                          StrokeShape="RoundRectangle 8"
+                                          Padding="12,6">
+                                      <Entry x:Name="CurrentRaGraduationEntry"
+                                          Placeholder="e.g. 4.2"
+                                          Keyboard="Numeric"
+                                          BackgroundColor="Transparent"
+                                          PlaceholderColor="{DynamicResource ColorTextMuted}"
+                                          TextColor="{DynamicResource ColorTextPrimary}"
+                                          TextChanged="OnCurrentRaGraduationChanged" />
+                                     </Border>
+                                 </VerticalStackLayout>
+
+                                 <VerticalStackLayout Grid.Column="1"
+                                             Spacing="4">
+                                     <Label Text="Turn to"
+                                         FontSize="12"
+                                         TextColor="{DynamicResource ColorTextSecondary}" />
+                                     <Label x:Name="TargetRaGraduationLabel"
+                                         Text="-"
+                                         FontSize="22"
+                                         FontAttributes="Bold"
+                                         TextColor="{DynamicResource ColorTextPrimary}" />
+                                 </VerticalStackLayout>
+
+                                 <Label x:Name="RaGraduationDeltaLabel"
+                                     Grid.Row="1"
+                                     Grid.ColumnSpan="2"
+                                     FontSize="12"
+                                     TextColor="{DynamicResource ColorTextSecondary}" />
+                                </Grid>
+
+                                <Label x:Name="RaGraduationStatusLabel"
+                                    FontSize="12"
+                                    TextColor="{DynamicResource ColorTextSecondary}" />
+
+                                <Label x:Name="RaGraduationErrorLabel"
+                                    IsVisible="False"
+                                    FontSize="12"
+                                    TextColor="{DynamicResource ColorError}" />
+                            </VerticalStackLayout>
+                           </Border>
+
                         <VerticalStackLayout x:Name="AboutLinkRows"
                                              IsVisible="False"
                                              Spacing="6">
@@ -135,30 +204,25 @@
                       FontSize="12"
                       TextColor="{DynamicResource ColorTextSecondary}" />
 
-                <FlexLayout Direction="Row"
-                            Wrap="Wrap"
-                            AlignItems="Center"
-                            JustifyContent="Start">
+                    <Grid ColumnDefinitions="*,*"
+                        ColumnSpacing="8">
                     <ui:AppButton x:Name="ManualGotoUIKitButton"
                                   Text="Manual Goto"
                                   Variant="Primary"
                                   MinimumHeightRequest="44"
-                                  Margin="0,0,8,8"
-                                  HorizontalOptions="Start"
-                                  FlexLayout.Grow="1"
-                                  FlexLayout.Basis="150"
+                                Margin="0,0,0,8"
+                                HorizontalOptions="Fill"
                                   Command="{Binding Source={x:Reference RootPage}, Path=ToggleManualGotoCommand}" />
 
-                    <ui:AppButton x:Name="AboutManualGotoButton"
-                                  Text="About Manual Goto"
+                      <ui:AppButton Grid.Column="1"
+                                x:Name="AboutManualGotoButton"
+                                Text="About Manual"
                                   Variant="Secondary"
                                   MinimumHeightRequest="44"
                                   Margin="0,0,0,8"
-                                  HorizontalOptions="Start"
-                                  FlexLayout.Grow="1"
-                                  FlexLayout.Basis="170"
+                                HorizontalOptions="Fill"
                                   Command="{Binding Source={x:Reference RootPage}, Path=ToggleAboutManualGotoCommand}" />
-                </FlexLayout>
+                    </Grid>
 
                 <ui:AppButton Text="Calibrate Directions"
                               Variant="Secondary"
