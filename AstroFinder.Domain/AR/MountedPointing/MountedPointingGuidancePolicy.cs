@@ -24,6 +24,8 @@ internal static class MountedPointingGuidancePolicy
             return "You are close. Make a smaller adjustment.";
         }
 
+        // Error sign convention: positive horizontal = target to the right,
+        // positive vertical = target above the phone axis.
         var horizontalWord = horizontalErrorDeg >= 0.0 ? "right" : "left";
         var verticalWord = verticalErrorDeg >= 0.0 ? "up" : "down";
 

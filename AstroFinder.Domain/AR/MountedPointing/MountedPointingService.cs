@@ -144,8 +144,6 @@ public sealed class MountedPointingService
         var mainVerticalErrorDeg = phoneVerticalErrorDeg - input.Boresight.PitchOffsetDeg;
         var angularErrorDeg = AngularError(mainHorizontalErrorDeg, mainVerticalErrorDeg);
 
-        var allDiagnostics = diagnostics.Concat([$"detected={detectedCount}"]).ToList();
-
         return new MountedPointingSolveResult(
             IsSolved: false,
             CanGuideReliably: false,
@@ -159,7 +157,7 @@ public sealed class MountedPointingService
                 mainVerticalErrorDeg,
                 angularErrorDeg,
                 _options),
-            Diagnostics: allDiagnostics,
+            Diagnostics: diagnostics,
             Warnings: warnings,
             CorrectedFrame: input.SeededFrame,
             Calibration: null);

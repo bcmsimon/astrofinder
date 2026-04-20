@@ -29,7 +29,7 @@ public partial class ArStarHopPage : ContentPage
     private bool _calibrationHintShown;
     private bool _isNightMode;
     private bool _mapOverlaySet;
-    private DateTimeOffset _lastLowConfidenceBannerAt;
+    private DateTimeOffset _lastLowConfidenceBannerTime;
 #if ANDROID
     private float[]? _lastModelMatrix;
 #endif
@@ -163,10 +163,10 @@ public partial class ArStarHopPage : ContentPage
 
         if (guidanceResult is not null
             && !guidanceResult.CanGuideReliably
-            && DateTimeOffset.UtcNow - _lastLowConfidenceBannerAt > TimeSpan.FromSeconds(3))
+            && DateTimeOffset.UtcNow - _lastLowConfidenceBannerTime > TimeSpan.FromSeconds(3))
         {
             ShowStatus(guidanceResult.GuidanceText);
-            _lastLowConfidenceBannerAt = DateTimeOffset.UtcNow;
+            _lastLowConfidenceBannerTime = DateTimeOffset.UtcNow;
         }
 
         // Still update the old overlay for off-screen arrow guidance only.

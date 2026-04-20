@@ -14,6 +14,7 @@ namespace AstroFinder.App.Platforms.Android.Ar;
 /// </summary>
 internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
 {
+    private const int GrayFrameIntervalMs = 700;
     private Session? _session;
     private int _cameraTextureId;
     private bool _sessionResumed;
@@ -299,7 +300,6 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
 
     private void TryPublishGrayFrame(Frame frame, long nowMs)
     {
-        const int GrayFrameIntervalMs = 700;
         if (nowMs - _lastGrayFrameCallbackMs < GrayFrameIntervalMs)
         {
             return;
@@ -361,6 +361,8 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
             for (var x = 0; x < width; x++)
             {
                 var src = rowOffset + (x * pixelStride);
+                // Defensive check: odd driver/image metadata can produce unexpected stride/index values.
+                // Unsigned cast keeps this as a single bounds check for both negative and upper bound.
                 if ((uint)src < (uint)raw.Length)
                 {
                     grayscale[dstRowOffset + x] = raw[src];
