@@ -1,71 +1,33 @@
 using Android.Content;
 using Android.Opengl;
-using AstroFinder.Domain.AR.Calibration;
+using AstroFinder.App.Controls;
 using Google.AR.Core;
 using Google.AR.Core.Exceptions;
 using Javax.Microedition.Khronos.Opengles;
+using ArFrame = Google.AR.Core.Frame;
 using Config = Google.AR.Core.Config;
 
 namespace AstroFinder.App.Platforms.Android.Ar;
 
 /// <summary>
-/// A <see cref="GLSurfaceView"/> that runs an ARCore session,
-/// renders the camera background, and provides per-frame camera pose callbacks.
+/// A <see cref="GLSurfaceView"/> that runs the minimal ARCore diagnostics path.
+/// Only the camera feed and one anchored cross are rendered so world-lock issues
+/// are not hidden behind overlay logic.
 /// </summary>
 internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
 {
-    private const int GrayFrameIntervalMs = 700;
     private Session? _session;
+    private Anchor? _markerAnchor;
     private int _cameraTextureId;
     private bool _sessionResumed;
-    private long _lastPoseCallbackMs;
-
-    // Map overlay state (set from main thread, consumed on GL thread).
-    private volatile global::Android.Graphics.Bitmap? _pendingBitmap;
-    private float[]? _mapModelMatrix;
-    private float _mapAlpha = 0.80f;
-    private bool _mapOverlayEnabled;
+    private bool _sessionInitialized;
+    private bool _markerPlaced;
+    private string _trackingState = "Stopped";
+    private string _markerPoseText = "not placed";
     private TrackingState? _lastTrackingState = TrackingState.Stopped;
-    private float[]? _lastViewMatrix;
-    private float[]? _lastProjMatrix;
-    private long _lastGrayFrameCallbackMs;
 
-    /// <summary>
-    /// Called on each frame that has valid tracking.
-    /// Parameters: (column-major 4x4 camera pose matrix, camera image width, camera image height,
-    ///              focal length X, focal length Y)
-    /// </summary>
-    public Action<float[], int, int, float, float, float>? OnFramePose { get; set; }
-    public Action<GrayImageFrame>? OnGrayFrame { get; set; }
-
-    /// <summary>
-    /// Called when ARCore session is created/ready.
-    /// </summary>
-    public Action? OnSessionReady { get; set; }
-
-    /// <summary>
-    /// Called with status/error messages.
-    /// </summary>
     public Action<string>? OnStatusMessage { get; set; }
-
-    /// <summary>
-    /// Set the map bitmap to be drawn as a world-space overlay.
-    /// Thread-safe: can be called from the main thread.
-    /// </summary>
-    public void SetMapOverlay(global::Android.Graphics.Bitmap bitmap, float[] modelMatrix, float alpha = 0.80f)
-    {
-        _pendingBitmap = bitmap;
-        _mapModelMatrix = modelMatrix;
-        _mapAlpha = alpha;
-        _mapOverlayEnabled = true;
-    }
-
-    public void ClearMapOverlay()
-    {
-        _mapOverlayEnabled = false;
-        _pendingBitmap = null;
-        _mapModelMatrix = null;
-    }
+    public Action<ArDiagnosticStatus>? OnDiagnosticsChanged { get; set; }
 
     public ArCoreGLView(Context context) : base(context)
     {
@@ -88,6 +50,7 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
             if (availability == ArCoreApk.Availability.UnsupportedDeviceNotCapable)
             {
                 OnStatusMessage?.Invoke("ARCore is not supported on this device.");
+                PublishDiagnostics();
                 return false;
             }
 
@@ -95,12 +58,17 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
             var config = new Config(_session);
             config.SetUpdateMode(Config.UpdateMode.LatestCameraImage!);
             config.SetFocusMode(Config.FocusMode.Auto!);
-            // We don't need planes, depth, or augmented images.
             config.SetPlaneFindingMode(Config.PlaneFindingMode.Disabled!);
             config.SetDepthMode(Config.DepthMode.Disabled!);
+            config.SetAugmentedImageDatabase(null);
+            config.GeospatialMode = Config.GeospatialMode.Disabled;
+            config.CloudAnchorMode = Config.CloudAnchorMode.Disabled;
             _session.Configure(config);
 
-            OnSessionReady?.Invoke();
+            _sessionInitialized = true;
+            System.Diagnostics.Debug.WriteLine("[ArCoreDiagnostic] Session started.");
+            OnStatusMessage?.Invoke("ARCore session started.");
+            PublishDiagnostics();
             return true;
         }
         catch (UnavailableException ex)
@@ -147,8 +115,12 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
     public void DestroySession()
     {
         PauseSession();
+        _markerAnchor?.Detach();
+        _markerAnchor?.Dispose();
+        _markerAnchor = null;
         _session?.Close();
         _session = null;
+        _sessionInitialized = false;
     }
 
     // -------------------------------------------------------------------------
@@ -159,12 +131,10 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
     {
         GLES20.GlClearColor(0f, 0f, 0f, 1f);
 
-        // Create the external OES texture for ARCore camera feed.
         _cameraTextureId = CameraBackgroundShader.CreateExternalTexture();
         CameraBackgroundShader.Initialize();
-        MapOverlayShader.Initialize();
+        DiagnosticCrossShader.Initialize();
 
-        // Tell ARCore which texture to render the camera into.
         _session?.SetCameraTextureName(_cameraTextureId);
     }
 
@@ -188,7 +158,6 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
             var camera = frame?.Camera;
             if (camera == null) return;
 
-            // Always draw camera background (even when not tracking, shows camera preview).
             float[] transformedUvs = new float[8];
             frame!.TransformCoordinates2d(
                 Coordinates2d.OpenglNormalizedDeviceCoordinates!,
@@ -198,94 +167,31 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
 
             CameraBackgroundShader.Draw(_cameraTextureId, transformedUvs);
 
-            // Upload pending bitmap if available (must happen on GL thread).
-            var pending = _pendingBitmap;
-            if (pending != null)
-            {
-                MapOverlayShader.UploadBitmap(pending);
-                _pendingBitmap = null; // consumed
-            }
-
             if (camera.TrackingState != _lastTrackingState)
             {
                 _lastTrackingState = camera.TrackingState;
-                var stateName = _lastTrackingState.ToString();
-                MainThread.BeginInvokeOnMainThread(() => OnStatusMessage?.Invoke($"ARCore tracking: {stateName}"));
-            }
-
-            // Draw map overlay if enabled (even if paused, try to use last known matrices).
-            if (_mapOverlayEnabled && _mapModelMatrix != null)
-            {
-                if (camera.TrackingState == TrackingState.Tracking)
-                {
-                    try
-                    {
-                        // Compute view matrix manually from DisplayOrientedPose
-                        float[] ctw = new float[16];
-                        camera.DisplayOrientedPose?.ToMatrix(ctw, 0);
-
-                        float[] viewMatrix = new float[16];
-                        // Transpose the 3x3 rotation part (R^T).
-                        viewMatrix[0]  = ctw[0]; viewMatrix[1]  = ctw[4]; viewMatrix[2]  = ctw[8];  viewMatrix[3]  = 0f;
-                        viewMatrix[4]  = ctw[1]; viewMatrix[5]  = ctw[5]; viewMatrix[6]  = ctw[9];  viewMatrix[7]  = 0f;
-                        viewMatrix[8]  = ctw[2]; viewMatrix[9]  = ctw[6]; viewMatrix[10] = ctw[10]; viewMatrix[11] = 0f;
-                        // For astronomical objects, map translation is locked to 0 so objects appear at infinity
-                        viewMatrix[12] = 0f;
-                        viewMatrix[13] = 0f;
-                        viewMatrix[14] = 0f;
-                        viewMatrix[15] = 1f;
-
-                        _lastViewMatrix = viewMatrix;
-
-                        float[] projMatrix = new float[16];
-                        camera.GetProjectionMatrix(projMatrix, 0, 0.1f, 100f);
-                        _lastProjMatrix = projMatrix;
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[ArCoreGLView] Get matrices error: {ex}");
-                    }
-                }
-
-                if (_lastViewMatrix != null && _lastProjMatrix != null)
-                {
-                    MapOverlayShader.Draw(_lastViewMatrix, _lastProjMatrix, _mapModelMatrix, _mapAlpha);
-                }
+                _trackingState = _lastTrackingState.ToString();
+                System.Diagnostics.Debug.WriteLine($"[ArCoreDiagnostic] Tracking state changed: {_trackingState}");
+                MainThread.BeginInvokeOnMainThread(() => OnStatusMessage?.Invoke($"ARCore tracking: {_trackingState}"));
+                PublishDiagnostics();
             }
 
             if (camera.TrackingState == TrackingState.Tracking)
             {
-                // Throttle pose callbacks to ~15 fps to reduce main-thread pressure.
-                long nowMs = Java.Lang.JavaSystem.CurrentTimeMillis();
-                TryPublishGrayFrame(frame!, nowMs);
-                if (nowMs - _lastPoseCallbackMs < 66) return; // skip if <66ms since last
-                _lastPoseCallbackMs = nowMs;
-
-                // Extract camera-to-world pose as 4x4 column-major matrix.
-                float[] poseMatrix = new float[16];
-                camera.DisplayOrientedPose?.ToMatrix(poseMatrix, 0);
-
-                // Also get raw sensor Pose pitch for diagnostic comparison.
-                float[] rawPoseMatrix = new float[16];
-                camera.Pose?.ToMatrix(rawPoseMatrix, 0);
-                // Forward = -col2 of c2w. col2[Y] = m[1*4+2] = m[6] (col-major) or m[2*4+1]=m[9] row-major.
-                // Column-major: col2 Y = rawPoseMatrix[1 + 2*4] = rawPoseMatrix[9]... no.
-                // Column-major col j starts at j*4: col2 = m[8],m[9],m[10],m[11].
-                // c2w[r,c] = m[c*4+r], so c2w[1,2] = m[2*4+1] = m[9].
-                // Forward Y = -c2w[1,2] = -m[9] (col-major), or just -m[6] if row-major.
-                // Compute both so we can tell: 
-                float sensorPitchColMaj = (float)(Math.Asin(Math.Clamp(-rawPoseMatrix[9], -1f, 1f)) * 180.0 / Math.PI);
-
-                // Extract camera intrinsics for accurate FOV.
-                var intrinsics = camera.ImageIntrinsics;
-                if (intrinsics != null)
+                if (!_markerPlaced)
                 {
-                    var focalLength = intrinsics.GetFocalLength();
-                    var dims = intrinsics.GetImageDimensions();
-                    if (focalLength != null && dims != null)
-                    {
-                        OnFramePose?.Invoke(poseMatrix, dims[0], dims[1], focalLength[0], focalLength[1], sensorPitchColMaj);
-                    }
+                    PlaceMarker(camera.Pose);
+                }
+
+                if (_markerAnchor?.TrackingState == TrackingState.Tracking)
+                {
+                    var viewMatrix = new float[16];
+                    var projectionMatrix = new float[16];
+                    var modelMatrix = new float[16];
+                    camera.GetViewMatrix(viewMatrix, 0);
+                    camera.GetProjectionMatrix(projectionMatrix, 0, 0.1f, 100f);
+                    _markerAnchor.Pose?.ToMatrix(modelMatrix, 0);
+                    DiagnosticCrossShader.Draw(viewMatrix, projectionMatrix, modelMatrix);
                 }
             }
         }
@@ -295,81 +201,37 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
         }
     }
 
-    // NDC quad corners for UV transform query.
     private static readonly float[] QuadNdc = { -1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f };
 
-    private void TryPublishGrayFrame(Frame frame, long nowMs)
+    private void PlaceMarker(Pose? cameraPose)
     {
-        if (nowMs - _lastGrayFrameCallbackMs < GrayFrameIntervalMs)
+        if (_session == null || cameraPose == null)
         {
             return;
         }
 
-        _lastGrayFrameCallbackMs = nowMs;
-        GrayImageFrame? grayFrame = null;
-        try
-        {
-            grayFrame = TryAcquireGrayFrame(frame);
-        }
-        catch (NotYetAvailableException)
-        {
-            return;
-        }
-        catch (DeadlineExceededException)
-        {
-            return;
-        }
-        catch
-        {
-            return;
-        }
+        // Place the marker exactly once. If this logic runs every frame, the marker
+        // will appear to follow the device because it is being recreated from the camera pose.
+        // In ARCore camera-local space, forward is negative Z, so translating by (0, 0, -1.5)
+        // moves the anchor 1.5 meters in front of the device at the moment of placement.
+        var markerPose = cameraPose.Compose(Pose.MakeTranslation(0f, 0f, -1.5f));
+        _markerAnchor = _session.CreateAnchor(markerPose);
+        _markerPlaced = true;
+        _markerPoseText = $"x={markerPose.Tx():F2}, y={markerPose.Ty():F2}, z={markerPose.Tz():F2}";
 
-        if (grayFrame is not null)
-        {
-            OnGrayFrame?.Invoke(grayFrame);
-        }
+        System.Diagnostics.Debug.WriteLine("[ArCoreDiagnostic] Marker placed.");
+        System.Diagnostics.Debug.WriteLine($"[ArCoreDiagnostic] Marker pose: {_markerPoseText}");
+        OnStatusMessage?.Invoke("Marker placed once at 1.5m forward.");
+        PublishDiagnostics();
     }
 
-    private static GrayImageFrame? TryAcquireGrayFrame(Frame frame)
+    private void PublishDiagnostics()
     {
-        using var image = frame.AcquireCameraImage();
-        var width = image.Width;
-        var height = image.Height;
-        var planes = image.GetPlanes();
-        if (planes == null || planes.Length == 0)
-        {
-            return null;
-        }
-
-        var lumaPlane = planes[0];
-        var buffer = lumaPlane.Buffer;
-        var rowStride = lumaPlane.RowStride;
-        var pixelStride = lumaPlane.PixelStride;
-        if (buffer == null || rowStride <= 0 || pixelStride <= 0 || width <= 0 || height <= 0)
-        {
-            return null;
-        }
-
-        var raw = new byte[buffer.Remaining()];
-        buffer.Get(raw);
-
-        var grayscale = new byte[width * height];
-        for (var y = 0; y < height; y++)
-        {
-            var rowOffset = y * rowStride;
-            var dstRowOffset = y * width;
-            for (var x = 0; x < width; x++)
-            {
-                var src = rowOffset + (x * pixelStride);
-                // Defensive check: odd driver/image metadata can produce unexpected stride/index values.
-                // Unsigned cast keeps this as a single bounds check for both negative and upper bound.
-                if ((uint)src < (uint)raw.Length)
-                {
-                    grayscale[dstRowOffset + x] = raw[src];
-                }
-            }
-        }
-
-        return new GrayImageFrame(width, height, grayscale);
+        OnDiagnosticsChanged?.Invoke(new ArDiagnosticStatus(
+            PlatformName: "Android",
+            SessionInitialized: _sessionInitialized,
+            TrackingState: _trackingState,
+            AnchorPlacedCount: _markerPlaced ? 1 : 0,
+            MarkerPoseText: _markerPoseText));
     }
 }

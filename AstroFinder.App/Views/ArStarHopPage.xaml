@@ -3,140 +3,88 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:controls="clr-namespace:AstroFinder.App.Controls"
              x:Class="AstroFinder.App.Views.ArStarHopPage"
-             Title="AR Stars"
+              Title="AR Diagnostic"
              Shell.NavBarIsVisible="False"
-             BackgroundColor="Black">
+              BackgroundColor="{DynamicResource ColorBackground}">
 
     <Grid>
-
-        <!-- CAMERA PREVIEW LAYER: ARCore camera background rendered by native GLSurfaceView -->
         <controls:ArCameraView x:Name="ArCamera"
-                                HorizontalOptions="Fill"
-                                VerticalOptions="Fill" />
+                         HorizontalOptions="Fill"
+                         VerticalOptions="Fill" />
 
-        <!-- Optional simulated night-vision filter -->
-        <BoxView x:Name="NightFilterOverlay"
-                 IsVisible="False"
-                 InputTransparent="True"
-                 Color="#DD140000"
-                 HorizontalOptions="Fill"
-                 VerticalOptions="Fill" />
-
-        <!-- OVERLAY LAYER: transparent canvas drawn on top of the camera feed. -->
-        <GraphicsView x:Name="OverlayView"
-                      BackgroundColor="Transparent"
-                      HorizontalOptions="Fill"
-                      VerticalOptions="Fill"
-                      InputTransparent="True" />
-
-        <!-- HUD: top bar with close / heading / calibrate -->
-          <Grid VerticalOptions="Start"
-                  HorizontalOptions="Fill"
-                  Padding="12,48,12,12"
-                  RowDefinitions="Auto,Auto,Auto"
-                          ColumnDefinitions="Auto,*,Auto"
-                          ColumnSpacing="8"
-                          RowSpacing="6">
+         <Grid VerticalOptions="Start"
+                HorizontalOptions="Fill"
+                Padding="12,48,12,12"
+                RowDefinitions="Auto,Auto"
+                ColumnDefinitions="Auto,*"
+                ColumnSpacing="12"
+                RowSpacing="12">
 
             <Button Grid.Column="0"
                     Text="Close"
-                    BackgroundColor="#80000000"
-                    TextColor="White"
+                      BackgroundColor="{DynamicResource ColorPrimary}"
+                      TextColor="{DynamicResource ColorTextInverse}"
                     FontSize="14"
                     CornerRadius="10"
                     Padding="14,8"
                     Clicked="OnCloseClicked" />
 
-            <Button Grid.Column="1"
-                    x:Name="NightModeButton"
-                    Text="Night AR"
-                    BackgroundColor="#80000000"
-                    TextColor="White"
-                    FontSize="13"
-                    CornerRadius="10"
-                    Padding="12,8"
-                    Clicked="OnNightModeClicked" />
+             <Border Grid.Column="1"
+                      BackgroundColor="{DynamicResource ColorSurface}"
+                      Stroke="{DynamicResource ColorBorder}"
+                      StrokeShape="RoundRectangle 14"
+                      StrokeThickness="1"
+                      Padding="12"
+                      Opacity="0.96">
+                  <VerticalStackLayout Spacing="6">
+                      <Label Text="AR anchor diagnostic"
+                              FontSize="14"
+                              FontAttributes="Bold"
+                              TextColor="{DynamicResource ColorTextPrimary}" />
+                      <Label Text="Only camera passthrough, one world marker, and this HUD are left enabled so anchor drift is easier to isolate."
+                              FontSize="12"
+                              TextColor="{DynamicResource ColorTextSecondary}" />
+                  </VerticalStackLayout>
+             </Border>
 
-            <Button Grid.Column="2"
-                    Text="Calibrate"
-                    BackgroundColor="#80000000"
-                    TextColor="White"
-                    FontSize="13"
-                    CornerRadius="10"
-                    Padding="12,8"
-                    Clicked="OnCalibrateClicked" />
-
-            <Label Grid.Row="1"
-                   Grid.ColumnSpan="4"
-                   x:Name="HeadingLabel"
-                   Text="—"
-                   TextColor="#CCFFFFFF"
-                   FontSize="12"
-                   LineBreakMode="NoWrap"
-                   MaxLines="1"
-                   HorizontalTextAlignment="Center"
-                   VerticalTextAlignment="Center" />
-
-            <Label Grid.Row="2"
-                   Grid.ColumnSpan="4"
-                   x:Name="DiagHudLabel"
-                   Text=""
-                   TextColor="#B8000000"
-                   BackgroundColor="#60FFFFFF"
-                   FontSize="9"
-                   FontFamily="monospace"
-                   LineBreakMode="WordWrap"
-                   MaxLines="14"
-                   Padding="6,4"
-                   HorizontalTextAlignment="Start"
-                   VerticalTextAlignment="Start" />
-
+             <Border Grid.Row="1"
+                      Grid.ColumnSpan="2"
+                      BackgroundColor="{DynamicResource ColorSurface}"
+                      Stroke="{DynamicResource ColorBorder}"
+                      StrokeShape="RoundRectangle 14"
+                      StrokeThickness="1"
+                      Padding="12"
+                      Opacity="0.96">
+                  <VerticalStackLayout Spacing="4">
+                      <Label x:Name="HudPlatformLabel"
+                              Text="Platform: pending"
+                              FontSize="12"
+                              TextColor="{DynamicResource ColorTextPrimary}" />
+                      <Label x:Name="HudSessionLabel"
+                              Text="Session initialized: no"
+                              FontSize="12"
+                              TextColor="{DynamicResource ColorTextPrimary}" />
+                      <Label x:Name="HudTrackingLabel"
+                              Text="Tracking state: waiting"
+                              FontSize="12"
+                              TextColor="{DynamicResource ColorTextPrimary}" />
+                      <Label x:Name="HudAnchorCountLabel"
+                              Text="Anchor placed count: 0"
+                              FontSize="12"
+                              TextColor="{DynamicResource ColorTextPrimary}" />
+                      <Label x:Name="HudMarkerPoseLabel"
+                              Text="Marker pose: not placed"
+                              FontSize="12"
+                              LineBreakMode="WordWrap"
+                              TextColor="{DynamicResource ColorTextSecondary}" />
+                      <Label x:Name="HudStatusLabel"
+                              Text="Status: waiting for AR session"
+                              FontSize="12"
+                              LineBreakMode="WordWrap"
+                              TextColor="{DynamicResource ColorAccent}" />
+                  </VerticalStackLayout>
+             </Border>
         </Grid>
-
-        <!-- Centre reticle: a faint crosshair to show where the phone is pointing. -->
-        <BoxView WidthRequest="1"
-                 HeightRequest="40"
-                 Color="#33FFFFFF"
-                 HorizontalOptions="Center"
-                 VerticalOptions="Center" />
-        <BoxView WidthRequest="40"
-                 HeightRequest="1"
-                 Color="#33FFFFFF"
-                 HorizontalOptions="Center"
-                 VerticalOptions="Center" />
-
-        <!-- Status banner: shown when sensors or location are unavailable. -->
-        <Border x:Name="StatusBanner"
-                IsVisible="False"
-                BackgroundColor="#CC000000"
-                StrokeThickness="0"
-                StrokeShape="RoundRectangle 12"
-                Padding="20,14"
-                HorizontalOptions="Center"
-                VerticalOptions="Center">
-            <Label x:Name="StatusLabel"
-                   Text=""
-                   TextColor="White"
-                   FontSize="14"
-                   HorizontalTextAlignment="Center" />
-        </Border>
-
-        <!-- Calibration hint: auto-dismissed after a few seconds. -->
-        <Border x:Name="CalibrationHint"
-                IsVisible="False"
-                BackgroundColor="#CC1A2E44"
-                StrokeThickness="0"
-                StrokeShape="RoundRectangle 0"
-                Padding="16,12"
-                VerticalOptions="End"
-                HorizontalOptions="Fill"
-                Margin="0,0,0,40">
-            <Label Text="Move the phone slowly in a figure-eight to improve compass accuracy."
-                   TextColor="White"
-                   FontSize="13"
-                   HorizontalTextAlignment="Center" />
-        </Border>
-
     </Grid>
 
 </ContentPage>

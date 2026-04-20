@@ -14,6 +14,11 @@ You are a senior MAUI and .NET engineering agent for AstroFinder.
 - Consume theming from `astroappstheming` (`AstroApps.Maui.Theming`).
 - If a shared capability is missing, add it to the shared repo first, then consume it here.
 
+## App Handoff Document (Required)
+- Canonical expert-AI handoff document: `docs/github-agent-handoff-app-overview.md`.
+- This document must describe AstroFinder's purpose, current user-visible workflows, and main features.
+- When features, screens, or core workflows are added, removed, renamed, or materially changed, update the handoff document in the same change set.
+
 ## Product Scope
 - AstroFinder is an astrophotography-oriented sky navigation and framing assistant.
 - It helps users locate deep-sky objects using visual star-hopping techniques and precise coordinate offsets.

@@ -16,6 +16,7 @@ public partial class MainPage : ContentPage
     private readonly ObserverOrientationService _observerOrientationService;
     private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
     private readonly MountSelectionService _mountSelectionService;
+    private readonly ArDebugFixtureReplayService _arDebugFixtureReplayService;
 
     public MainPage(
         MainPageViewModel viewModel,
@@ -24,7 +25,8 @@ public partial class MainPage : ContentPage
         IDeviceOrientationService deviceOrientationService,
         ObserverOrientationService observerOrientationService,
         ManualGotoCalibrationService manualGotoCalibrationService,
-        MountSelectionService mountSelectionService)
+        MountSelectionService mountSelectionService,
+        ArDebugFixtureReplayService arDebugFixtureReplayService)
     {
         _vm = viewModel;
         _settingsBootstrapper = settingsBootstrapper;
@@ -33,6 +35,7 @@ public partial class MainPage : ContentPage
         _observerOrientationService = observerOrientationService;
         _manualGotoCalibrationService = manualGotoCalibrationService;
         _mountSelectionService = mountSelectionService;
+        _arDebugFixtureReplayService = arDebugFixtureReplayService;
 
         // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
         OpenSettingsCommand = new Command(async () => await OpenSettingsAsync());
@@ -43,7 +46,7 @@ public partial class MainPage : ContentPage
         _vm.ShowStarMap += async data =>
         {
             await Navigation.PushModalAsync(
-                new StarMapPage(data, _deviceOrientationService, _observerOrientationService));
+                new StarMapPage(data, _deviceOrientationService, _observerOrientationService, _arDebugFixtureReplayService));
         };
 
         _vm.ShowDeltasFlyout += async data =>

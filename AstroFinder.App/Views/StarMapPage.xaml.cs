@@ -8,16 +8,19 @@ public partial class StarMapPage : ContentPage
     private readonly string _mapHtml;
     private readonly IDeviceOrientationService _deviceOrientationService;
     private readonly ObserverOrientationService _observerOrientationService;
+    private readonly ArDebugFixtureReplayService _arDebugFixtureReplayService;
     private double _lastViewportSide;
 
     public StarMapPage(
         StarMapData data,
         IDeviceOrientationService deviceOrientationService,
-        ObserverOrientationService observerOrientationService)
+        ObserverOrientationService observerOrientationService,
+        ArDebugFixtureReplayService arDebugFixtureReplayService)
     {
         _data = data;
         _deviceOrientationService = deviceOrientationService;
         _observerOrientationService = observerOrientationService;
+        _arDebugFixtureReplayService = arDebugFixtureReplayService;
 
         InitializeComponent();
 
@@ -112,8 +115,7 @@ public partial class StarMapPage : ContentPage
         // Navigate regardless — the AR page gracefully uses a dark background
         // when the camera is unavailable.
         _ = status; // used above; explicit discard avoids warning
-        await Navigation.PushModalAsync(
-            new ArStarHopPage(_data, _deviceOrientationService, _observerOrientationService));
+        await Navigation.PushModalAsync(new ArStarHopPage());
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)

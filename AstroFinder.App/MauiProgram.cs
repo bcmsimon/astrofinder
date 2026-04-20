@@ -10,6 +10,8 @@ using CommunityToolkit.Maui;
 using Microsoft.Extensions.Logging;
 #if ANDROID
 using AstroFinder.App.Platforms.Android.Ar;
+#elif IOS
+using AstroFinder.App.Platforms.iOS.Ar;
 #endif
 
 namespace AstroFinder.App;
@@ -29,6 +31,8 @@ public static class MauiProgram
             {
 #if ANDROID
                 handlers.AddHandler<ArCameraView, ArCameraViewHandler>();
+#elif IOS
+                                handlers.AddHandler<ArCameraView, ArCameraViewHandler>();
 #endif
             });
 
@@ -51,6 +55,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<AppCatalogProvider>();
         builder.Services.AddSingleton<ObserverOrientationService>();
         builder.Services.AddSingleton<FolderWatcherCaptureConfidenceService>();
+        builder.Services.AddSingleton<ArDebugFixtureReplayService>();
 #if ANDROID
         builder.Services.AddSingleton<IArFrameSource, AndroidCameraFrameSource>();
         // Android: ARCore provides camera pose via visual-inertial odometry.

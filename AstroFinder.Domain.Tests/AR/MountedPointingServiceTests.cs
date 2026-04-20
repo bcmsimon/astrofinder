@@ -1,3 +1,4 @@
+using AstroFinder.Domain.AR;
 using AstroFinder.Domain.AR.Calibration;
 using AstroFinder.Domain.AR.MountedPointing;
 
@@ -7,6 +8,9 @@ public sealed class MountedPointingServiceTests
 {
     private static readonly CameraIntrinsics TestIntrinsics =
         CameraIntrinsics.FromHorizontalFov(60.0, 1000, 1000);
+
+    private static readonly CameraIntrinsics FixtureIntrinsics =
+        CameraIntrinsics.FromHorizontalFov(60.0, 40, 40);
 
     [Fact]
     public void Solve_SuccessfulSeededSolve_ReturnsReliableGuidance()
@@ -24,7 +28,8 @@ public sealed class MountedPointingServiceTests
         Assert.True(result.CanGuideReliably);
         Assert.True(result.Confidence >= 0.35);
         Assert.True(result.AngularErrorToTargetDeg > 0.1);
-        Assert.Contains("Move", result.GuidanceText);
+        Assert.Contains("right", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("up", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -75,7 +80,7 @@ public sealed class MountedPointingServiceTests
     public void Solve_GuidanceText_UsesPlainActionableLanguage()
     {
         var seeded = BuildSeededFrame(new ArScreenPoint(500, 500));
-        var image = BuildSyntheticGrayFrame(seeded, tx: 64.0, ty: -10.0);
+        var image = BuildSyntheticGrayFrame(seeded, tx: 52.0, ty: -10.0);
         var service = new MountedPointingService();
 
         var result = service.Solve(new MountedPointingInput(
@@ -84,7 +89,49 @@ public sealed class MountedPointingServiceTests
             MountedPointingBoresight.Zero));
 
         Assert.True(result.CanGuideReliably);
-        Assert.Equal("Move right and slightly up.", result.GuidanceText);
+        Assert.Contains("right", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("up", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("perfect", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("exact", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("guaranteed", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Solve_FixtureImage_ReturnsReliableGuidance()
+    {
+        var seeded = BuildFixtureSeededFrame(new ArScreenPoint(20, 20));
+        var image = FixtureImageLoader.LoadGrayFrame("mounted-pointing-offset.txt");
+        var service = new MountedPointingService();
+
+        var result = service.Solve(new MountedPointingInput(
+            seeded,
+            image,
+            MountedPointingBoresight.Zero));
+
+        Assert.True(result.IsSolved);
+        Assert.True(result.CanGuideReliably);
+        Assert.True(result.Confidence >= 0.35);
+        Assert.Contains("right", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("up", result.GuidanceText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Solve_SparseFixtureImage_DegradesSafely()
+    {
+        var seeded = BuildFixtureSeededFrame(new ArScreenPoint(20, 20));
+        var image = FixtureImageLoader.LoadGrayFrame("mounted-pointing-sparse.txt");
+        var service = new MountedPointingService();
+
+        var result = service.Solve(new MountedPointingInput(
+            seeded,
+            image,
+            MountedPointingBoresight.Zero));
+
+        Assert.False(result.IsSolved);
+        Assert.False(result.CanGuideReliably);
+        Assert.Equal(0.0, result.Confidence);
+        Assert.Contains("Solve confidence is too low", result.GuidanceText);
+        Assert.Contains(result.Warnings, warning => warning.Contains("Insufficient detected stars", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -143,7 +190,58 @@ public sealed class MountedPointingServiceTests
             RouteSegments: []);
     }
 
+    private static ArOverlayFrame BuildFixtureSeededFrame(ArScreenPoint? targetScreenPoint)
+    {
+        var stars = new List<ProjectedSkyObject>
+        {
+            MakeFixtureStar("S1", 8, 8, ArOverlayRole.BackgroundStar, 2.0),
+            MakeFixtureStar("S2", 31, 8, ArOverlayRole.BackgroundStar, 2.1),
+            MakeFixtureStar("S3", 10, 31, ArOverlayRole.BackgroundStar, 2.2),
+            MakeFixtureStar("S4", 30, 30, ArOverlayRole.BackgroundStar, 2.3),
+            MakeFixtureStar("S5", 20, 12, ArOverlayRole.AsterismStar, 1.8),
+            MakeFixtureStar("S6", 14, 21, ArOverlayRole.HopStar, 2.4),
+            MakeFixtureStar("S7", 26, 23, ArOverlayRole.HopStar, 2.5),
+        };
+
+        var target = new ProjectedSkyObject(
+            Id: "Target",
+            Label: "Target",
+            ScreenPoint: targetScreenPoint,
+            InFrontOfCamera: true,
+            WithinViewport: targetScreenPoint.HasValue,
+            AltitudeDeg: 45.0,
+            AzimuthDeg: 130.0,
+            DirectionEnu: new Vec3(0.3, 0.7, 0.5),
+            Role: ArOverlayRole.Target,
+            Magnitude: 8.0);
+
+        return new ArOverlayFrame(
+            Target: target,
+            AsterismStars: stars.Where(s => s.Role == ArOverlayRole.AsterismStar).ToList(),
+            AsterismSegments: [],
+            HopSteps: stars.Where(s => s.Role == ArOverlayRole.HopStar).ToList(),
+            BackgroundStars: stars.Where(s => s.Role == ArOverlayRole.BackgroundStar).ToList(),
+            Intrinsics: FixtureIntrinsics,
+            OffscreenArrow: null,
+            TargetAngularDistanceDegrees: 0.0,
+            CenterReticleText: null,
+            RouteSegments: []);
+    }
+
     private static ProjectedSkyObject MakeStar(string id, float x, float y, ArOverlayRole role, double magnitude) =>
+        new(
+            Id: id,
+            Label: id,
+            ScreenPoint: new ArScreenPoint(x, y),
+            InFrontOfCamera: true,
+            WithinViewport: true,
+            AltitudeDeg: 40.0,
+            AzimuthDeg: 120.0,
+            DirectionEnu: new Vec3(0.4, 0.6, 0.5),
+            Role: role,
+            Magnitude: magnitude);
+
+    private static ProjectedSkyObject MakeFixtureStar(string id, float x, float y, ArOverlayRole role, double magnitude) =>
         new(
             Id: id,
             Label: id,

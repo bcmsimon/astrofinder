@@ -62,6 +62,16 @@ public partial class SettingsPage : ContentPage
         _viewModel.ApplyArDebugHudToggle(e.Value);
     }
 
+    private void OnArDebugFixtureReplayToggleChanged(object? sender, ToggledEventArgs e)
+    {
+        if (_isInitializing)
+        {
+            return;
+        }
+
+        _viewModel.ApplyArDebugFixtureReplayToggle(e.Value);
+    }
+
     private async void OnSelectMountClicked(object? sender, EventArgs e)
     {
         var options = await _viewModel.GetAvailableMountNamesAsync();
@@ -83,5 +93,28 @@ public partial class SettingsPage : ContentPage
         }
 
         await _viewModel.ApplySelectedMountAsync(choice);
+    }
+
+    private async void OnSelectArDebugFixtureClicked(object? sender, EventArgs e)
+    {
+        var options = _viewModel.GetAvailableArDebugFixtures();
+        if (options.Count == 0)
+        {
+            await DisplayAlert("AR debug fixture", "No debug fixtures are available in this build.", "OK");
+            return;
+        }
+
+        var labels = options.Select(option => option.DisplayName).ToArray();
+        var choice = await DisplayActionSheet("Select AR debug fixture", "Cancel", null, labels);
+        if (string.IsNullOrWhiteSpace(choice) || string.Equals(choice, "Cancel", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        var selected = options.FirstOrDefault(option => option.DisplayName == choice);
+        if (selected is not null)
+        {
+            _viewModel.ApplySelectedArDebugFixture(selected.Id);
+        }
     }
 }

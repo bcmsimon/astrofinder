@@ -8,25 +8,30 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
 {
     private readonly ObserverOrientationService _observerOrientationService;
     private readonly ArCameraService _arCameraService;
+    private readonly ArDebugFixtureReplayService _arDebugFixtureReplayService;
     private readonly MountSelectionService _mountSelectionService;
     private bool _useLocationOrientation;
     private bool _invertParallacticAngleForDisplay;
     private bool _useArCamera;
     private bool _showArDebugHud;
+    private bool _useArDebugFixtureReplay;
     private bool _isBusy;
     private string _selectedMountText = "No mount selected";
     private string _statusText = "Location access is off. Star hop maps use a north-up chart.";
     private string _arStatusText = "AR sky view is off. Enable to use the live camera viewfinder.";
+    private string _arDebugFixtureStatusText = "Debug fixture replay is off.";
 
     public const string ShowArDebugHudKey = "astrofinder.show-ar-debug-hud";
 
     public SettingsPageViewModel(
         ObserverOrientationService observerOrientationService,
         ArCameraService arCameraService,
+        ArDebugFixtureReplayService arDebugFixtureReplayService,
         MountSelectionService mountSelectionService)
     {
         _observerOrientationService = observerOrientationService;
         _arCameraService = arCameraService;
+        _arDebugFixtureReplayService = arDebugFixtureReplayService;
         _mountSelectionService = mountSelectionService;
     }
 
@@ -120,6 +125,30 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         }
     }
 
+    public bool IsArDebugFixtureReplayAvailable => _arDebugFixtureReplayService.IsAvailable;
+
+    public bool UseArDebugFixtureReplay
+    {
+        get => _useArDebugFixtureReplay;
+        private set
+        {
+            if (_useArDebugFixtureReplay == value) return;
+            _useArDebugFixtureReplay = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public string ArDebugFixtureStatusText
+    {
+        get => _arDebugFixtureStatusText;
+        private set
+        {
+            if (_arDebugFixtureStatusText == value) return;
+            _arDebugFixtureStatusText = value;
+            OnPropertyChanged();
+        }
+    }
+
     public async Task InitializeAsync()
     {
         UseLocationOrientation = _observerOrientationService.IsLocationOrientationEnabled;
@@ -137,6 +166,8 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
             : selectedMount;
 
         ShowArDebugHud = Preferences.Default.Get(ShowArDebugHudKey, false);
+        UseArDebugFixtureReplay = _arDebugFixtureReplayService.IsEnabled;
+        ArDebugFixtureStatusText = FormatArDebugFixtureStatus();
     }
 
     public Task<IReadOnlyList<string>> GetAvailableMountNamesAsync()
@@ -184,6 +215,24 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         ShowArDebugHud = enabled;
     }
 
+    public void ApplyArDebugFixtureReplayToggle(bool enabled)
+    {
+        _arDebugFixtureReplayService.SetEnabled(enabled);
+        UseArDebugFixtureReplay = _arDebugFixtureReplayService.IsEnabled;
+        ArDebugFixtureStatusText = FormatArDebugFixtureStatus();
+    }
+
+    public IReadOnlyList<ArDebugFixtureOption> GetAvailableArDebugFixtures()
+    {
+        return _arDebugFixtureReplayService.GetAvailableFixtures();
+    }
+
+    public void ApplySelectedArDebugFixture(string fixtureId)
+    {
+        _arDebugFixtureReplayService.SetSelectedFixture(fixtureId);
+        ArDebugFixtureStatusText = FormatArDebugFixtureStatus();
+    }
+
     private static string FormatStatus(LocationOrientationStatus status) => status switch
     {
         LocationOrientationStatus.Enabled => "Location enabled. Star hop maps will rotate to match your current sky using the configured display direction.",
@@ -198,6 +247,24 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         CameraArStatus.PermissionDenied => "Camera permission was denied. Enable camera access in your device settings to use the AR view.",
         _ => "AR sky view is off. Enable to use the live camera viewfinder."
     };
+
+    private string FormatArDebugFixtureStatus()
+    {
+        if (!_arDebugFixtureReplayService.IsAvailable)
+        {
+            return "Debug fixture replay is unavailable in this build.";
+        }
+
+        if (!_arDebugFixtureReplayService.IsEnabled)
+        {
+            return "Debug fixture replay is off.";
+        }
+
+        var options = _arDebugFixtureReplayService.GetAvailableFixtures();
+        var selected = options.FirstOrDefault(option => option.Id == _arDebugFixtureReplayService.SelectedFixtureId)
+            ?? options.First();
+        return $"Debug fixture replay is on. Active fixture: {selected.DisplayName}. {selected.Description}";
+    }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
