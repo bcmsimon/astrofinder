@@ -107,6 +107,29 @@ This Windows workspace could not finish an exact RealityKit implementation becau
 
 Because of that, a temporary iOS SceneKit fallback was partially added in the repo only as a placeholder. On the Mac-backed continuation, do not treat that fallback as the intended final design.
 
+## Latest update from Mac-backed continuation (Apr 20, 2026)
+
+The Mac continuation confirmed the same underlying constraint in this toolchain: RealityKit types are still not available to the .NET iOS compiler surface used by this workspace (for example `RealityKit.ARView`, `AnchorEntity`, `Entity` not found at compile time).
+
+A bridge-first structure was added so the app-facing handler can stay stable while the native iOS implementation is swapped later:
+
+- `ArCameraViewHandler` now targets `UIView` and consumes a native bridge interface.
+- `ArDiagnosticNativeBridge` currently routes to the SceneKit diagnostic host.
+- The bridge is the intended seam for a future Swift-backed RealityKit host.
+
+The iOS diagnostic view was also repaired to compile and run with this binding set:
+
+- split frame callbacks into `ARSessionDelegate` (for `DidUpdateFrame`) and scene rendering into `ARSCNViewDelegate`
+- keep one-time anchor placement semantics (no per-frame repositioning)
+- preserve HUD/status callbacks to MAUI
+
+Additional startup hardening was added while diagnosing splash-time failures on an iPhone SE (iOS 15.8.7):
+
+- iOS debug mtouch startup environment now disables diagnostics/profiler startup paths in project settings
+- `MainPage.OnAppearing` initialization was moved to fire-and-forget async startup with guard + exception logging so the first page can render sooner
+
+This improved launch behavior enough to install and launch consistently via `mlaunch`, though further iOS UX verification is still required on device.
+
 ## Files changed in this session for the diagnostic path
 
 These changes were made toward the temporary diagnostic refactor:
@@ -121,23 +144,36 @@ These changes were made toward the temporary diagnostic refactor:
 - `AstroFinder.App/Platforms/Android/Ar/DiagnosticCrossShader.cs`
 - `AstroFinder.App/Platforms/iOS/Ar/ArCameraViewHandler.cs`
 - `AstroFinder.App/Platforms/iOS/Ar/ArKitDiagnosticView.cs`
+- `AstroFinder.App/Platforms/iOS/Ar/ArDiagnosticNativeBridge.cs`
+- `AstroFinder.App/Platforms/iOS/Ar/ArKitDiagnosticView.WindowsFallback.cs`
 
 ### What those changes mean
 
 - The MAUI AR page was simplified into a diagnostic HUD page.
 - Android was moved toward a one-anchor diagnostic implementation.
-- iOS currently contains a SceneKit fallback placeholder using `ARSCNView`, not the requested RealityKit `ARView`.
+- iOS currently contains a SceneKit fallback implementation using `ARSCNView`, wrapped behind a bridge seam for future RealityKit swap-in.
+- The MAUI iOS handler no longer depends directly on a specific native AR view type.
 
 ## What to do next on the Mac-backed continuation
 
 1. Inspect current diffs in AstroFinder and isolate the AR diagnostic edits from unrelated repo changes.
 2. Keep the simplified MAUI diagnostic page shape if it is useful.
-3. Replace the current iOS fallback path with a true native RealityKit `ARView` host.
-4. If MAUI still cannot see `ARView` directly, add whatever native iOS bridge is necessary in the Mac-backed environment.
+3. Keep the bridge seam (`IArDiagnosticNativeBridge`) and replace only the bridge implementation with a true native RealityKit host.
+4. Implement the RealityKit host in native Swift if the .NET binding surface still omits `ARView`.
 5. Keep the iOS implementation explicit and minimal.
 6. Verify the marker is placed once and remains world-locked as the device moves.
 7. Preserve the Android one-anchor diagnostic path unless it proves broken during validation.
 8. Update `docs/github-agent-handoff-app-overview.md` if the user-visible AR workflow has materially changed.
+
+## What to do next on Windows
+
+When switching back to Windows, treat iOS as non-runnable but keep iOS code build-safe:
+
+1. Continue Android AR diagnostic iteration only.
+2. Keep `ArKitDiagnosticView.WindowsFallback.cs` in place for Windows-side iOS compile compatibility.
+3. Do not attempt to validate RealityKit behavior from Windows; reserve that for Mac+iPhone sessions.
+4. Keep all app-level AR contracts and HUD semantics shared so Android and iOS remain behaviorally aligned.
+5. Keep the bridge interface stable so the future Swift RealityKit bridge can drop in without MAUI handler changes.
 
 ## RealityKit guidance for the Mac-backed implementation
 

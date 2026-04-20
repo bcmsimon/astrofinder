@@ -17,6 +17,7 @@ public partial class MainPage : ContentPage
     private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
     private readonly MountSelectionService _mountSelectionService;
     private readonly ArDebugFixtureReplayService _arDebugFixtureReplayService;
+    private bool _startupInitializationStarted;
 
     public MainPage(
         MainPageViewModel viewModel,
@@ -77,13 +78,32 @@ public partial class MainPage : ContentPage
 
     public ICommand OpenSettingsCommand { get; }
 
-    protected override async void OnAppearing()
+    protected override void OnAppearing()
     {
         base.OnAppearing();
-        _settingsBootstrapper.EnsureRegistered();
-        await _vm.LoadCatalogsAsync();
-        await EnsureMountSelectionAsync();
-        _vm.RefreshMountSelection();
+
+        if (_startupInitializationStarted)
+        {
+            return;
+        }
+
+        _startupInitializationStarted = true;
+        _ = InitializeStartupAsync();
+    }
+
+    private async Task InitializeStartupAsync()
+    {
+        try
+        {
+            _settingsBootstrapper.EnsureRegistered();
+            await _vm.LoadCatalogsAsync();
+            await EnsureMountSelectionAsync();
+            _vm.RefreshMountSelection();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[AstroFinder] Startup initialization failed: {ex}");
+        }
     }
 
     private async Task EnsureMountSelectionAsync()

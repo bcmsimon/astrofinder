@@ -1,10 +1,13 @@
 using AstroFinder.App.Controls;
 using Microsoft.Maui.Handlers;
+using UIKit;
 
 namespace AstroFinder.App.Platforms.iOS.Ar;
 
-internal sealed class ArCameraViewHandler : ViewHandler<ArCameraView, ArKitDiagnosticView>
+internal sealed class ArCameraViewHandler : ViewHandler<ArCameraView, UIView>
 {
+    private IArDiagnosticNativeBridge? _bridge;
+
     public static readonly PropertyMapper<ArCameraView, ArCameraViewHandler> Mapper =
         new(ViewHandler.ViewMapper);
 
@@ -12,19 +15,18 @@ internal sealed class ArCameraViewHandler : ViewHandler<ArCameraView, ArKitDiagn
     {
     }
 
-    protected override ArKitDiagnosticView CreatePlatformView()
+    protected override UIView CreatePlatformView()
     {
-        var view = new ArKitDiagnosticView();
-        view.OnStatusMessage = message => VirtualView?.RaiseStatusMessage(message);
-        view.OnDiagnosticsChanged = diagnostics => VirtualView?.RaiseDiagnosticsChanged(diagnostics);
-        return view;
+        _bridge = new ArDiagnosticNativeBridge();
+        _bridge.StatusMessage += message => VirtualView?.RaiseStatusMessage(message);
+        _bridge.DiagnosticsChanged += diagnostics => VirtualView?.RaiseDiagnosticsChanged(diagnostics);
+        return _bridge.PlatformView;
     }
 
-    protected override void DisconnectHandler(ArKitDiagnosticView platformView)
+    protected override void DisconnectHandler(UIView platformView)
     {
-        platformView.OnStatusMessage = null;
-        platformView.OnDiagnosticsChanged = null;
-        platformView.StopSession();
+        _bridge?.StopSession();
+        _bridge = null;
         base.DisconnectHandler(platformView);
     }
 }

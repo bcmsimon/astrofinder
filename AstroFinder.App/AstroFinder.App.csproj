@@ -39,6 +39,11 @@
 		<AndroidFastDeploymentType>None</AndroidFastDeploymentType>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)' == 'Debug|net8.0-ios'">
+		<!-- Work around early Mono runtime abort on some iOS 15 devices by disabling diagnostics startup paths. -->
+		<MtouchExtraArgs>$(MtouchExtraArgs) --setenv=DOTNET_EnableDiagnostics=0 --setenv=MONO_PROFILE= --setenv=MONO_LOG_LEVEL=error</MtouchExtraArgs>
+	</PropertyGroup>
+
 	<PropertyGroup Condition="'$(TargetFramework)' == 'net8.0-android'">
 		<AndroidZipAlignmentPageSize>16384</AndroidZipAlignmentPageSize>
 	</PropertyGroup>
@@ -58,6 +63,15 @@
 
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'ios'">
 		<Compile Include="Services\FolderWatcherCaptureConfidenceService.iOS.cs" />
+	</ItemGroup>
+
+	<!-- On Windows the RealityKit binding is not available. Swap in the stub so the iOS target still compiles. -->
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios' and $([MSBuild]::IsOSPlatform('windows'))">
+		<Compile Remove="Platforms\iOS\Ar\ArKitDiagnosticView.cs" />
+		<Compile Include="Platforms\iOS\Ar\ArKitDiagnosticView.WindowsFallback.cs" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios' and !$([MSBuild]::IsOSPlatform('windows'))">
+		<Compile Remove="Platforms\iOS\Ar\ArKitDiagnosticView.WindowsFallback.cs" />
 	</ItemGroup>
 
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'ios'">
