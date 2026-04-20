@@ -1,3 +1,5 @@
+using AstroFinder.Domain.AR.Calibration;
+
 namespace AstroFinder.App.Controls;
 
 /// <summary>
@@ -6,6 +8,11 @@ namespace AstroFinder.App.Controls;
 /// </summary>
 public class ArCameraView : View
 {
+    private static readonly GrayImageFrame EmptyFrame =
+        new(0, 0, []);
+    private readonly object _frameGate = new();
+    private GrayImageFrame _latestGrayFrame = EmptyFrame;
+
     /// <summary>
     /// Raised when ARCore/ARKit reports an error or status message.
     /// </summary>
@@ -36,6 +43,23 @@ public class ArCameraView : View
     /// <summary>Clear the bitmap map overlay.</summary>
     public void ClearMapOverlay() =>
         MapOverlayRequested?.Invoke(this, null);
+
+    public bool TryGetLatestGrayFrame(out GrayImageFrame frame)
+    {
+        lock (_frameGate)
+        {
+            frame = _latestGrayFrame;
+            return frame.Width > 0 && frame.Height > 0;
+        }
+    }
+
+    internal void SetLatestGrayFrame(GrayImageFrame frame)
+    {
+        lock (_frameGate)
+        {
+            _latestGrayFrame = frame;
+        }
+    }
 }
 
 /// <summary>
