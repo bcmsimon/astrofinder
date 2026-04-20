@@ -2,6 +2,7 @@ using AstroFinder.App.Services;
 using AstroFinder.App.ViewModels;
 using AstroFinder.Domain.AR;
 using AstroFinder.Domain.AR.Calibration;
+using AstroFinder.Domain.AR.MountedPointing;
 using AstroFinder.Engine.Geometry;
 using AstroFinder.Engine.Primitives;
 
@@ -19,13 +20,16 @@ public partial class ArStarHopPage : ContentPage
     private readonly IDeviceOrientationService _orientationService;
     private readonly ObserverOrientationService _observerOrientationService;
     private readonly ArProjectionService _projectionService = new();
+    private readonly MountedPointingService _mountedPointingService = new();
     private readonly ArOverlayDrawable _overlayDrawable = new();
+    private readonly MountedPointingBoresight _boresight = MountedPointingBoresight.Zero;
 
     private ArRouteInput? _routeInput;
     private CameraIntrinsics _intrinsics = CameraIntrinsics.Default;
     private bool _calibrationHintShown;
     private bool _isNightMode;
     private bool _mapOverlaySet;
+    private DateTimeOffset _lastLowConfidenceBannerAt;
 #if ANDROID
     private float[]? _lastModelMatrix;
 #endif
@@ -140,15 +144,47 @@ public partial class ArStarHopPage : ContentPage
         // --- Lightweight diagnostics only (no per-frame projection) ---
         var liveInput = _routeInput with { ObservationTime = DateTimeOffset.Now };
         var frame = _projectionService.Project(liveInput, pose, _intrinsics);
+        var guidanceResult = SolveMountedPointing(frame);
+        var displayFrame = guidanceResult?.CorrectedFrame ?? frame;
 
-        HeadingLabel.Text = $"{frame.TargetAngularDistanceDegrees:F0}\u00B0 to target";
+        HeadingLabel.Text = guidanceResult is null
+            ? $"{frame.TargetAngularDistanceDegrees:F0}\u00B0 to target"
+            : guidanceResult.CanGuideReliably
+                ? $"{guidanceResult.GuidanceText} ({guidanceResult.AngularErrorToTargetDeg:F1}\u00B0)"
+                : guidanceResult.GuidanceText;
 
         if (DiagHudLabel.IsVisible)
-            DiagHudLabel.Text = GetFullDiagnostics();
+        {
+            var calibrationDiag = guidanceResult?.Calibration is null
+                ? string.Empty
+                : $"\nSolve conf: {guidanceResult.Confidence:F2}  match/inlier: {guidanceResult.Calibration.MatchedCount}/{guidanceResult.Calibration.InlierCount}";
+            DiagHudLabel.Text = GetFullDiagnostics() + calibrationDiag;
+        }
+
+        if (guidanceResult is not null
+            && !guidanceResult.CanGuideReliably
+            && DateTimeOffset.UtcNow - _lastLowConfidenceBannerAt > TimeSpan.FromSeconds(3))
+        {
+            ShowStatus(guidanceResult.GuidanceText);
+            _lastLowConfidenceBannerAt = DateTimeOffset.UtcNow;
+        }
 
         // Still update the old overlay for off-screen arrow guidance only.
-        _overlayDrawable.Update(frame);
+        _overlayDrawable.Update(displayFrame);
         OverlayView.Invalidate();
+    }
+
+    private MountedPointingSolveResult? SolveMountedPointing(ArOverlayFrame seededFrame)
+    {
+        if (!ArCamera.TryGetLatestGrayFrame(out var cameraFrame))
+        {
+            return null;
+        }
+
+        return _mountedPointingService.Solve(new MountedPointingInput(
+            seededFrame,
+            cameraFrame,
+            _boresight));
     }
 
     /// <summary>

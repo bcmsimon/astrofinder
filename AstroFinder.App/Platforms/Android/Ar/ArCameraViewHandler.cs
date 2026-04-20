@@ -25,6 +25,7 @@ internal class ArCameraViewHandler : ViewHandler<ArCameraView, ArCoreGLView>
 
         // Wire ARCore frame poses to the provider.
         glView.OnFramePose = (m, w, h, fx, fy, sensorPitch) => _poseProvider?.OnArCorePose(m, w, h, fx, fy, sensorPitch);
+        glView.OnGrayFrame = frame => VirtualView?.SetLatestGrayFrame(frame);
         glView.OnStatusMessage = msg =>
             MainThread.BeginInvokeOnMainThread(() => VirtualView?.RaiseStatusMessage(msg));
 
@@ -65,6 +66,7 @@ internal class ArCameraViewHandler : ViewHandler<ArCameraView, ArCoreGLView>
         platformView.PauseSession();
         platformView.DestroySession();
         platformView.OnFramePose = null;
+        platformView.OnGrayFrame = null;
         platformView.OnStatusMessage = null;
         base.DisconnectHandler(platformView);
     }

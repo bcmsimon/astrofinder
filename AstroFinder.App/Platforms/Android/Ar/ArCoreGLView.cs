@@ -1,5 +1,6 @@
 using Android.Content;
 using Android.Opengl;
+using AstroFinder.Domain.AR.Calibration;
 using Google.AR.Core;
 using Google.AR.Core.Exceptions;
 using Javax.Microedition.Khronos.Opengles;
@@ -26,6 +27,7 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
     private TrackingState? _lastTrackingState = TrackingState.Stopped;
     private float[]? _lastViewMatrix;
     private float[]? _lastProjMatrix;
+    private long _lastGrayFrameCallbackMs;
 
     /// <summary>
     /// Called on each frame that has valid tracking.
@@ -33,6 +35,7 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
     ///              focal length X, focal length Y)
     /// </summary>
     public Action<float[], int, int, float, float, float>? OnFramePose { get; set; }
+    public Action<GrayImageFrame>? OnGrayFrame { get; set; }
 
     /// <summary>
     /// Called when ARCore session is created/ready.
@@ -253,6 +256,7 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
             {
                 // Throttle pose callbacks to ~15 fps to reduce main-thread pressure.
                 long nowMs = Java.Lang.JavaSystem.CurrentTimeMillis();
+                TryPublishGrayFrame(frame!, nowMs);
                 if (nowMs - _lastPoseCallbackMs < 66) return; // skip if <66ms since last
                 _lastPoseCallbackMs = nowMs;
 
@@ -292,4 +296,78 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
 
     // NDC quad corners for UV transform query.
     private static readonly float[] QuadNdc = { -1f, -1f, 1f, -1f, -1f, 1f, 1f, 1f };
+
+    private void TryPublishGrayFrame(Frame frame, long nowMs)
+    {
+        const int GrayFrameIntervalMs = 700;
+        if (nowMs - _lastGrayFrameCallbackMs < GrayFrameIntervalMs)
+        {
+            return;
+        }
+
+        _lastGrayFrameCallbackMs = nowMs;
+        GrayImageFrame? grayFrame = null;
+        try
+        {
+            grayFrame = TryAcquireGrayFrame(frame);
+        }
+        catch (NotYetAvailableException)
+        {
+            return;
+        }
+        catch (DeadlineExceededException)
+        {
+            return;
+        }
+        catch
+        {
+            return;
+        }
+
+        if (grayFrame is not null)
+        {
+            OnGrayFrame?.Invoke(grayFrame);
+        }
+    }
+
+    private static GrayImageFrame? TryAcquireGrayFrame(Frame frame)
+    {
+        using var image = frame.AcquireCameraImage();
+        var width = image.Width;
+        var height = image.Height;
+        var planes = image.GetPlanes();
+        if (planes == null || planes.Length == 0)
+        {
+            return null;
+        }
+
+        var lumaPlane = planes[0];
+        var buffer = lumaPlane.Buffer;
+        var rowStride = lumaPlane.RowStride;
+        var pixelStride = lumaPlane.PixelStride;
+        if (buffer == null || rowStride <= 0 || pixelStride <= 0 || width <= 0 || height <= 0)
+        {
+            return null;
+        }
+
+        var raw = new byte[buffer.Remaining()];
+        buffer.Get(raw);
+
+        var grayscale = new byte[width * height];
+        for (var y = 0; y < height; y++)
+        {
+            var rowOffset = y * rowStride;
+            var dstRowOffset = y * width;
+            for (var x = 0; x < width; x++)
+            {
+                var src = rowOffset + (x * pixelStride);
+                if ((uint)src < (uint)raw.Length)
+                {
+                    grayscale[dstRowOffset + x] = raw[src];
+                }
+            }
+        }
+
+        return new GrayImageFrame(width, height, grayscale);
+    }
 }
