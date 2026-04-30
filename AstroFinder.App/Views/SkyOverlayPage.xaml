@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:controls="clr-namespace:AstroFinder.App.Controls"
+             xmlns:toolkit="http://schemas.microsoft.com/dotnet/2022/maui/toolkit"
+             x:Class="AstroFinder.App.Views.SkyOverlayPage"
+             Title="Sky Overlay"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="Black">
+
+    <!-- Camera preview behind overlay -->
+    <Grid>
+
+        <!-- Layer 1: Camera viewfinder -->
+        <toolkit:CameraView x:Name="CameraPreview"
+                            HorizontalOptions="Fill"
+                            VerticalOptions="Fill" />
+
+        <!-- Layer 1b: Night mode dim — black veil over camera, hidden in daylight mode -->
+        <BoxView x:Name="NightModeDim"
+                 Color="Black"
+                 Opacity="0.82"
+                 IsVisible="False"
+                 HorizontalOptions="Fill"
+                 VerticalOptions="Fill"
+                 InputTransparent="True" />
+
+        <!-- Layer 2: Transparent overlay drawn on top of the camera -->
+        <controls:SkyOverlayView x:Name="SkyOverlay"
+                                 HorizontalOptions="Fill"
+                                 VerticalOptions="Fill"
+                                 BackgroundColor="Transparent"
+                                 InputTransparent="True" />
+
+        <!-- Layer 2b: Guide arrow — shows direction to target when off-screen -->
+        <controls:TargetGuideView x:Name="TargetGuide"
+                                   HorizontalOptions="Fill"
+                                   VerticalOptions="Fill" />
+
+        <!-- Layer 3a: Pinch capture — native ScaleGestureDetector; MAUI PinchGestureRecognizer
+             is bypassed by CameraView's SurfaceView so a platform handler is required. -->
+        <controls:PinchCaptureView x:Name="PinchCapture"
+                                    HorizontalOptions="Fill"
+                                    VerticalOptions="Fill" />
+
+        <!-- Layer 4: Orientation readout — Az/Alt/Roll displayed permanently at bottom -->
+        <Border VerticalOptions="End"
+                HorizontalOptions="Center"
+                Margin="0,0,0,24"
+                BackgroundColor="#CC000000"
+                StrokeShape="RoundRectangle 8"
+                StrokeThickness="0"
+                Padding="14,6">
+            <Label x:Name="DiagnosticsLabel"
+                   Text="Az: --  Alt: --  Roll: --"
+                   FontSize="11"
+                   FontFamily="Courier New"
+                   TextColor="#FF7A7A"
+                   HorizontalOptions="Center" />
+        </Border>
+
+        <!-- Layer 5: Compass calibration overlay — centred, shown only when needed -->
+        <controls:CompassCalibrationView x:Name="CalibrationOverlay"
+                                         IsVisible="False"
+                                         VerticalOptions="Center"
+                                         HorizontalOptions="Fill" />
+
+        <!-- Layer 3: HUD controls -->
+        <Border VerticalOptions="Start"
+                HorizontalOptions="Center"
+                Margin="12,48,12,0"
+                BackgroundColor="{DynamicResource ColorSurface}"
+                Stroke="{DynamicResource ColorBorder}"
+                StrokeThickness="1"
+                StrokeShape="RoundRectangle 14"
+                Padding="16,12">
+            <Grid ColumnDefinitions="Auto,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="0"
+                        Text="Close"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorPrimary}"
+                        FontSize="14"
+                        Clicked="OnCloseClicked" />
+                <Button Grid.Column="1"
+                        x:Name="NightModeButton"
+                        Text="Night"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorPrimary}"
+                        FontSize="14"
+                        Clicked="OnNightModeToggled" />
+                <Button Grid.Column="2"
+                        Text="Solve"
+                        BackgroundColor="Transparent"
+                        TextColor="{DynamicResource ColorPrimary}"
+                        FontSize="14"
+                        Clicked="OnSolveClicked" />
+            </Grid>
+        </Border>
+
+    </Grid>
+
+</ContentPage>

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using AstroApps.Equipment.Profiles.Enums;
 using AstroFinder.Engine.Geometry;
 using AstroFinder.Engine.Primitives;
 using Microsoft.Maui.Graphics;
@@ -241,28 +242,29 @@ internal static class StarMapHtmlBuilder
 
         var sb = new StringBuilder();
         var plotId = "plotClip";
+        var skyGradId = "skyGlow";
 
         sb.Append($"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 {CanvasWidth} {CanvasHeight}' width='{CanvasWidth}' height='{CanvasHeight}'>");
-        sb.Append($"<defs><clipPath id='{plotId}'><rect x='{usableRect.Left:F1}' y='{usableRect.Top:F1}' width='{usableRect.Width:F1}' height='{usableRect.Height:F1}' rx='18' ry='18' /></clipPath></defs>");
+        sb.Append($"<defs><clipPath id='{plotId}'><rect x='{usableRect.Left:F1}' y='{usableRect.Top:F1}' width='{usableRect.Width:F1}' height='{usableRect.Height:F1}' rx='18' ry='18' /></clipPath><radialGradient id='{skyGradId}' cx='50%' cy='50%' r='50%' fx='50%' fy='50%'><stop offset='0%' stop-color='#1e2654'/><stop offset='60%' stop-color='#111530'/><stop offset='100%' stop-color='#090c1e'/></radialGradient></defs>");
         sb.Append($"<rect x='0' y='0' width='{CanvasWidth}' height='{CanvasHeight}' fill='{ToCss(pageBackground)}' />");
-        sb.Append($"<rect x='{plotRect.Left:F1}' y='{plotRect.Top:F1}' width='{plotRect.Width:F1}' height='{plotRect.Height:F1}' rx='16' ry='16' fill='{ToCss(plotBackground)}' stroke='{ToCss(borderColor)}' stroke-width='2' />");
+        sb.Append($"<rect x='{plotRect.Left:F1}' y='{plotRect.Top:F1}' width='{plotRect.Width:F1}' height='{plotRect.Height:F1}' rx='16' ry='16' fill='url(#{skyGradId})' stroke='{ToCss(borderColor)}' stroke-width='2' />");
 
         sb.Append($"<g clip-path='url(#{plotId})'>");
-        sb.Append($"<line x1='{usableRect.Left:F1}' y1='{centerPoint.Y:F1}' x2='{usableRect.Right:F1}' y2='{centerPoint.Y:F1}' stroke='{ToCss(borderColor, 0.45f)}' stroke-width='1.5' />");
-        sb.Append($"<line x1='{centerPoint.X:F1}' y1='{usableRect.Top:F1}' x2='{centerPoint.X:F1}' y2='{usableRect.Bottom:F1}' stroke='{ToCss(borderColor, 0.45f)}' stroke-width='1.5' />");
+        sb.Append($"<line x1='{usableRect.Left:F1}' y1='{centerPoint.Y:F1}' x2='{usableRect.Right:F1}' y2='{centerPoint.Y:F1}' stroke='#FFFFFF' stroke-opacity='0.10' stroke-width='1.5' />");
+        sb.Append($"<line x1='{centerPoint.X:F1}' y1='{usableRect.Top:F1}' x2='{centerPoint.X:F1}' y2='{usableRect.Bottom:F1}' stroke='#FFFFFF' stroke-opacity='0.10' stroke-width='1.5' />");
 
         foreach (var star in data.MapFillStars)
         {
             var pt = ToCanvas(star.RaHours, star.DecDeg);
             var r = StarRadius(star.Magnitude) * 1.1f;
-            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{r:F1}' fill='{ToCss(textSecondary, BackgroundStarAlpha(star.Magnitude) * 0.6f)}' />");
+            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{r:F1}' fill='#C8D4F0' fill-opacity='{BackgroundStarAlpha(star.Magnitude) * 0.5f:F2}' />");
         }
 
         foreach (var star in data.BackgroundStars)
         {
             var pt = ToCanvas(star.RaHours, star.DecDeg);
             var r = StarRadius(star.Magnitude) * 1.4f;
-            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{r:F1}' fill='{ToCss(textSecondary, BackgroundStarAlpha(star.Magnitude))}' />");
+            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{r:F1}' fill='#C8D4F0' fill-opacity='{BackgroundStarAlpha(star.Magnitude):F2}' />");
         }
 
         foreach (var (from, to) in data.AsterismSegments)
@@ -276,13 +278,13 @@ internal static class StarMapHtmlBuilder
             var s2 = data.AsterismStars[to];
             var p1 = ToCanvas(s1.RaHours, s1.DecDeg);
             var p2 = ToCanvas(s2.RaHours, s2.DecDeg);
-            sb.Append($"<line x1='{p1.X:F1}' y1='{p1.Y:F1}' x2='{p2.X:F1}' y2='{p2.Y:F1}' stroke='{ToCss(primary, 0.85f)}' stroke-width='2.4' />");
+            sb.Append($"<line x1='{p1.X:F1}' y1='{p1.Y:F1}' x2='{p2.X:F1}' y2='{p2.Y:F1}' stroke='#6B8AF5' stroke-opacity='0.85' stroke-width='2.4' />");
         }
 
         foreach (var star in data.AsterismStars)
         {
             var pt = ToCanvas(star.RaHours, star.DecDeg);
-            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{StarRadius(star.Magnitude):F1}' fill='{ToCss(primary, 0.92f)}' />");
+            sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{StarRadius(star.Magnitude):F1}' fill='#6B8AF5' fill-opacity='0.92' />");
         }
 
         if (data.HopSteps.Count > 0)
@@ -291,60 +293,108 @@ internal static class StarMapHtmlBuilder
             {
                 var from = ToCanvas(data.HopSteps[i].RaHours, data.HopSteps[i].DecDeg);
                 var to = ToCanvas(data.HopSteps[i + 1].RaHours, data.HopSteps[i + 1].DecDeg);
-                sb.Append($"<line x1='{from.X:F1}' y1='{from.Y:F1}' x2='{to.X:F1}' y2='{to.Y:F1}' stroke='{ToCss(accent)}' stroke-width='3' stroke-dasharray='16 10' />");
+                sb.Append($"<line x1='{from.X:F1}' y1='{from.Y:F1}' x2='{to.X:F1}' y2='{to.Y:F1}' stroke='#FBBF24' stroke-width='3' stroke-dasharray='16 10' />");
             }
 
             var lastHop = data.HopSteps[^1];
             var lastHopPoint = ToCanvas(lastHop.RaHours, lastHop.DecDeg);
-            sb.Append($"<line x1='{lastHopPoint.X:F1}' y1='{lastHopPoint.Y:F1}' x2='{targetPoint.X:F1}' y2='{targetPoint.Y:F1}' stroke='{ToCss(accent)}' stroke-width='3' stroke-dasharray='16 10' />");
+            sb.Append($"<line x1='{lastHopPoint.X:F1}' y1='{lastHopPoint.Y:F1}' x2='{targetPoint.X:F1}' y2='{targetPoint.Y:F1}' stroke='#FBBF24' stroke-width='3' stroke-dasharray='16 10' />");
 
             for (var i = 1; i < data.HopSteps.Count; i++)
             {
                 var pt = ToCanvas(data.HopSteps[i].RaHours, data.HopSteps[i].DecDeg);
-                sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{(StarRadius(data.HopSteps[i].Magnitude) + 1f):F1}' fill='{ToCss(accent)}' />");
+                sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='{(StarRadius(data.HopSteps[i].Magnitude) + 1f):F1}' fill='#FBBF24' />");
             }
         }
 
         if (anchorPoint.HasValue && data.HopSteps.Count > 0)
         {
             var anchorRadius = StarRadius(data.HopSteps[0].Magnitude) + 5f;
-            sb.Append($"<circle cx='{anchorPoint.Value.X:F1}' cy='{anchorPoint.Value.Y:F1}' r='{anchorRadius:F1}' fill='none' stroke='{ToCss(success)}' stroke-width='2.2' />");
+            sb.Append($"<circle cx='{anchorPoint.Value.X:F1}' cy='{anchorPoint.Value.Y:F1}' r='{anchorRadius:F1}' fill='none' stroke='#34D399' stroke-width='2.2' />");
         }
 
-        sb.Append($"<line x1='{targetPoint.X - targetSize:F1}' y1='{targetPoint.Y:F1}' x2='{targetPoint.X + targetSize:F1}' y2='{targetPoint.Y:F1}' stroke='{ToCss(error)}' stroke-width='2.6' />");
-        sb.Append($"<line x1='{targetPoint.X:F1}' y1='{targetPoint.Y - targetSize:F1}' x2='{targetPoint.X:F1}' y2='{targetPoint.Y + targetSize:F1}' stroke='{ToCss(error)}' stroke-width='2.6' />");
-        sb.Append($"<circle cx='{targetPoint.X:F1}' cy='{targetPoint.Y:F1}' r='{(targetSize * 0.7f):F1}' fill='none' stroke='{ToCss(error)}' stroke-width='2.2' />");
+        // Nearby catalog targets — only draw those whose projection lands inside the viewport
+        var displayRotationDeg = data.UseObserverOrientation ? data.DisplayRotationDegrees : 0.0;
+        foreach (var nearby in data.NearbyTargets)
+        {
+            var pt = ToCanvas(nearby.RaHours, nearby.DecDeg);
+            if (!usableRect.Contains(pt))
+                continue;
+            if (nearby.Category == ShootingTargetCategory.Galaxy)
+            {
+                var pa = nearby.PositionAngleDeg ?? 0.0;
+                var svgRot = 180.0 + displayRotationDeg - pa;
+                // Filled inner body + outer ring for visibility
+                sb.Append($"<ellipse cx='{pt.X:F1}' cy='{pt.Y:F1}' rx='6' ry='14' fill='#22D3EE' fill-opacity='0.15' stroke='#22D3EE' stroke-width='2' transform='rotate({svgRot:F1},{pt.X:F1},{pt.Y:F1})' />");
+                sb.Append($"<ellipse cx='{pt.X:F1}' cy='{pt.Y:F1}' rx='9' ry='20' fill='none' stroke='#22D3EE' stroke-width='1.5' stroke-opacity='0.5' transform='rotate({svgRot:F1},{pt.X:F1},{pt.Y:F1})' />");
+            }
+            else
+            {
+                sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='7' fill='#22D3EE' fill-opacity='0.15' stroke='#22D3EE' stroke-width='2' />");
+                sb.Append($"<circle cx='{pt.X:F1}' cy='{pt.Y:F1}' r='11' fill='none' stroke='#22D3EE' stroke-width='1.5' stroke-opacity='0.5' />");
+            }
+
+            AddPointObstacle(occupiedAreas, pt, 14f);
+        }
+
+        // Primary target — galaxy draws as oriented ellipse; other types draw standard crosshair+circle
+        if (data.TargetCategory == ShootingTargetCategory.Galaxy)
+        {
+            var pa = data.TargetPositionAngleDeg ?? 0.0;
+            var svgRot = 180.0 + displayRotationDeg - pa;
+            sb.Append($"<ellipse cx='{targetPoint.X:F1}' cy='{targetPoint.Y:F1}' rx='7' ry='16' fill='#F87171' fill-opacity='0.12' stroke='#F87171' stroke-width='2.2' transform='rotate({svgRot:F1},{targetPoint.X:F1},{targetPoint.Y:F1})' />");
+            sb.Append($"<line x1='{targetPoint.X - targetSize * 0.6f:F1}' y1='{targetPoint.Y:F1}' x2='{targetPoint.X + targetSize * 0.6f:F1}' y2='{targetPoint.Y:F1}' stroke='#F87171' stroke-width='1.8' />");
+            sb.Append($"<line x1='{targetPoint.X:F1}' y1='{targetPoint.Y - targetSize * 0.6f:F1}' x2='{targetPoint.X:F1}' y2='{targetPoint.Y + targetSize * 0.6f:F1}' stroke='#F87171' stroke-width='1.8' />");
+        }
+        else
+        {
+            sb.Append($"<line x1='{targetPoint.X - targetSize:F1}' y1='{targetPoint.Y:F1}' x2='{targetPoint.X + targetSize:F1}' y2='{targetPoint.Y:F1}' stroke='#F87171' stroke-width='2.6' />");
+            sb.Append($"<line x1='{targetPoint.X:F1}' y1='{targetPoint.Y - targetSize:F1}' x2='{targetPoint.X:F1}' y2='{targetPoint.Y + targetSize:F1}' stroke='#F87171' stroke-width='2.6' />");
+            sb.Append($"<circle cx='{targetPoint.X:F1}' cy='{targetPoint.Y:F1}' r='{(targetSize * 0.7f):F1}' fill='none' stroke='#F87171' stroke-width='2.2' />");
+        }
         sb.Append("</g>");
 
-        sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + 22:F1}' fill='{ToCss(textSecondary)}' font-size='22'>via {WebUtility.HtmlEncode(data.AsterismName)}</text>");
+        sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + 22:F1}' fill='#A0AABB' font-size='22'>via {WebUtility.HtmlEncode(data.AsterismName)}</text>");
         if (data.UseObserverOrientation)
         {
             AppendNorthPointer(sb, plotRect, textSecondary, accent, displayRotationRadians, data.IsTargetAboveHorizon);
         }
         else
         {
-            sb.Append($"<text x='{plotRect.Left + (plotRect.Width / 2f):F1}' y='{plotRect.Top + 22:F1}' fill='{ToCss(textSecondary)}' font-size='22' text-anchor='middle'>N</text>");
-            sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='{ToCss(textSecondary)}' font-size='22'>E</text>");
-            sb.Append($"<text x='{plotRect.Right - 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='{ToCss(textSecondary)}' font-size='22' text-anchor='end'>W</text>");
+            sb.Append($"<text x='{plotRect.Left + (plotRect.Width / 2f):F1}' y='{plotRect.Top + 22:F1}' fill='#A0AABB' font-size='22' text-anchor='middle'>N</text>");
+            sb.Append($"<text x='{plotRect.Left + 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='#A0AABB' font-size='22'>E</text>");
+            sb.Append($"<text x='{plotRect.Right - 12:F1}' y='{plotRect.Top + (plotRect.Height / 2f):F1}' fill='#A0AABB' font-size='22' text-anchor='end'>W</text>");
         }
 
+        var darkPlotBg = Color.FromArgb("#0d1030");
+        var labelColor = Color.FromArgb("#E4EAFF");
         var placedLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        AppendLabel(sb, usableRect, occupiedAreas, targetPoint, data.Target.Label, error, plotBackground, centerPoint, 28f, targetSize + 4f, placedLabels);
+        var ls = data.LabelScale;
+        AppendLabel(sb, usableRect, occupiedAreas, targetPoint, data.Target.Label, labelColor, darkPlotBg, centerPoint, 28f * ls, targetSize + 4f, placedLabels);
 
         if (data.HopSteps.Count > 0)
         {
             var anchor = data.HopSteps[0];
-            AppendLabel(sb, usableRect, occupiedAreas, anchorPoint ?? ToCanvas(anchor.RaHours, anchor.DecDeg), anchor.Label, success, plotBackground, centerPoint, 24f, StarRadius(anchor.Magnitude) + 6f, placedLabels);
+            AppendLabel(sb, usableRect, occupiedAreas, anchorPoint ?? ToCanvas(anchor.RaHours, anchor.DecDeg), anchor.Label, labelColor, darkPlotBg, centerPoint, 24f * ls, StarRadius(anchor.Magnitude) + 6f, placedLabels);
         }
 
         foreach (var step in data.HopSteps.Skip(1))
         {
-            AppendLabel(sb, usableRect, occupiedAreas, ToCanvas(step.RaHours, step.DecDeg), step.Label, accent, plotBackground, centerPoint, 22f, StarRadius(step.Magnitude) + 5f, placedLabels);
+            AppendLabel(sb, usableRect, occupiedAreas, ToCanvas(step.RaHours, step.DecDeg), step.Label, labelColor, darkPlotBg, centerPoint, 22f * ls, StarRadius(step.Magnitude) + 5f, placedLabels);
         }
 
         foreach (var star in data.AsterismStars)
         {
-            AppendLabel(sb, usableRect, occupiedAreas, ToCanvas(star.RaHours, star.DecDeg), star.Label, textPrimary, plotBackground, centerPoint, 22f, StarRadius(star.Magnitude) + 4f, placedLabels);
+            AppendLabel(sb, usableRect, occupiedAreas, ToCanvas(star.RaHours, star.DecDeg), star.Label, labelColor, darkPlotBg, centerPoint, 22f * ls, StarRadius(star.Magnitude) + 4f, placedLabels);
+        }
+
+        var nearbyLabelColor = Color.FromArgb("#67E8F9");
+        foreach (var nearby in data.NearbyTargets)
+        {
+            var nearbyPt = ToCanvas(nearby.RaHours, nearby.DecDeg);
+            if (!usableRect.Contains(nearbyPt))
+                continue;
+            AppendLabel(sb, usableRect, occupiedAreas, nearbyPt, nearby.Label, nearbyLabelColor, darkPlotBg, centerPoint, 20f * ls, 9f, placedLabels);
         }
 
         sb.Append("</svg>");
@@ -383,13 +433,13 @@ internal static class StarMapHtmlBuilder
             pointerCenter.Y + (float)(perpendicular.Y * wingOffset) - (float)(screenVector.Y * wingPullback));
 
         sb.Append("<g id='north-pointer'>");
-        sb.Append($"<polygon points='{tip.X:F1},{tip.Y:F1} {leftWing.X:F1},{leftWing.Y:F1} {tail.X:F1},{tail.Y:F1}' fill='#FFFFFF' stroke='{ToCss(accent)}' stroke-width='4' stroke-linejoin='round' />");
-        sb.Append($"<polygon points='{tip.X:F1},{tip.Y:F1} {rightWing.X:F1},{rightWing.Y:F1} {tail.X:F1},{tail.Y:F1}' fill='{ToCss(accent)}' stroke='{ToCss(accent)}' stroke-width='4' stroke-linejoin='round' />");
-        sb.Append($"<text x='{tip.X:F1}' y='{(tip.Y - 14f):F1}' fill='{ToCss(textColor)}' font-size='28' font-weight='700' text-anchor='middle'>N</text>");
+        sb.Append($"<polygon points='{tip.X:F1},{tip.Y:F1} {leftWing.X:F1},{leftWing.Y:F1} {tail.X:F1},{tail.Y:F1}' fill='#FFFFFF' fill-opacity='0.85' stroke='#FBBF24' stroke-width='4' stroke-linejoin='round' />");
+        sb.Append($"<polygon points='{tip.X:F1},{tip.Y:F1} {rightWing.X:F1},{rightWing.Y:F1} {tail.X:F1},{tail.Y:F1}' fill='#FBBF24' stroke='#FBBF24' stroke-width='4' stroke-linejoin='round' />");
+        sb.Append($"<text x='{tip.X:F1}' y='{(tip.Y - 14f):F1}' fill='#E4EAFF' font-size='28' font-weight='700' text-anchor='middle'>N</text>");
 
         if (!isTargetAboveHorizon)
         {
-            sb.Append($"<text x='{pointerCenter.X:F1}' y='{(pointerCenter.Y + 58f):F1}' fill='{ToCss(textColor)}' font-size='16' text-anchor='middle'>Target below horizon</text>");
+            sb.Append($"<text x='{pointerCenter.X:F1}' y='{(pointerCenter.Y + 58f):F1}' fill='#A0AABB' font-size='16' text-anchor='middle'>Target below horizon</text>");
         }
 
         sb.Append("</g>");

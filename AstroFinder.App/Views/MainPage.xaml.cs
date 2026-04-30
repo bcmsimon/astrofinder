@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using AstroApps.Equipment.Profiles.Interfaces;
 using AstroApps.Equipment.Profiles.Models;
 using AstroApps.Maui.UIKit.Settings;
 using AstroFinder.App.Services;
@@ -17,6 +18,8 @@ public partial class MainPage : ContentPage
     private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
     private readonly MountSelectionService _mountSelectionService;
     private readonly ArDebugFixtureReplayService _arDebugFixtureReplayService;
+    private readonly IEquipmentKitCollectionManager _kitCollectionManager;
+    private readonly EquipmentKitSettingsPage _equipmentKitSettingsPage;
     private bool _startupInitializationStarted;
 
     public MainPage(
@@ -27,7 +30,9 @@ public partial class MainPage : ContentPage
         ObserverOrientationService observerOrientationService,
         ManualGotoCalibrationService manualGotoCalibrationService,
         MountSelectionService mountSelectionService,
-        ArDebugFixtureReplayService arDebugFixtureReplayService)
+        ArDebugFixtureReplayService arDebugFixtureReplayService,
+        IEquipmentKitCollectionManager kitCollectionManager,
+        EquipmentKitSettingsPage equipmentKitSettingsPage)
     {
         _vm = viewModel;
         _settingsBootstrapper = settingsBootstrapper;
@@ -37,6 +42,8 @@ public partial class MainPage : ContentPage
         _manualGotoCalibrationService = manualGotoCalibrationService;
         _mountSelectionService = mountSelectionService;
         _arDebugFixtureReplayService = arDebugFixtureReplayService;
+        _kitCollectionManager = kitCollectionManager;
+        _equipmentKitSettingsPage = equipmentKitSettingsPage;
 
         // Must be assigned before InitializeComponent so the XAML binding resolves a non-null command.
         OpenSettingsCommand = new Command(async () => await OpenSettingsAsync());
@@ -97,6 +104,7 @@ public partial class MainPage : ContentPage
         {
             _settingsBootstrapper.EnsureRegistered();
             await _vm.LoadCatalogsAsync();
+            await EnsureKitConfiguredAsync();
             await EnsureMountSelectionAsync();
             _vm.RefreshMountSelection();
         }
@@ -104,6 +112,27 @@ public partial class MainPage : ContentPage
         {
             System.Diagnostics.Debug.WriteLine($"[AstroFinder] Startup initialization failed: {ex}");
         }
+    }
+
+    private async Task EnsureKitConfiguredAsync()
+    {
+        var collection = await _kitCollectionManager.GetCollectionAsync();
+        if (HasKitConfigured(collection))
+        {
+            return;
+        }
+
+        await Navigation.PushModalAsync(_equipmentKitSettingsPage);
+    }
+
+    private static bool HasKitConfigured(EquipmentKitCollection collection)
+    {
+        return !string.IsNullOrWhiteSpace(collection.SelectedKit.Camera)
+            || !string.IsNullOrWhiteSpace(collection.SelectedKit.Lens)
+            || !string.IsNullOrWhiteSpace(collection.SelectedKit.Mount)
+            || collection.Cameras.Count > 0
+            || collection.Lenses.Count > 0
+            || collection.Mounts.Count > 0;
     }
 
     private async Task EnsureMountSelectionAsync()

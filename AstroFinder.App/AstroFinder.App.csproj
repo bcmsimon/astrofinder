@@ -66,12 +66,16 @@
 	</ItemGroup>
 
 	<!-- On Windows the RealityKit binding is not available. Swap in the stub so the iOS target still compiles. -->
-	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios' and $([MSBuild]::IsOSPlatform('windows'))">
+	<!-- Always exclude both files from default glob; re-include the right one per condition. -->
+	<ItemGroup>
 		<Compile Remove="Platforms\iOS\Ar\ArKitDiagnosticView.cs" />
+		<Compile Remove="Platforms\iOS\Ar\ArKitDiagnosticView.WindowsFallback.cs" />
+	</ItemGroup>
+	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios' and $([MSBuild]::IsOSPlatform('windows'))">
 		<Compile Include="Platforms\iOS\Ar\ArKitDiagnosticView.WindowsFallback.cs" />
 	</ItemGroup>
 	<ItemGroup Condition="'$(TargetFramework)' == 'net8.0-ios' and !$([MSBuild]::IsOSPlatform('windows'))">
-		<Compile Remove="Platforms\iOS\Ar\ArKitDiagnosticView.WindowsFallback.cs" />
+		<Compile Include="Platforms\iOS\Ar\ArKitDiagnosticView.cs" />
 	</ItemGroup>
 
 	<ItemGroup Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) != 'ios'">

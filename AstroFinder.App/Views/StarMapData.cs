@@ -1,3 +1,5 @@
+using AstroApps.Equipment.Profiles.Enums;
+
 namespace AstroFinder.App.Views;
 
 /// <summary>
@@ -8,6 +10,17 @@ public sealed record StarMapPoint(
     double DecDeg,
     double Magnitude,
     string? Label);
+
+/// <summary>
+/// A nearby catalog target visible within the current map viewport.
+/// </summary>
+public sealed record StarMapNearbyTarget(
+    double RaHours,
+    double DecDeg,
+    double Magnitude,
+    string? Label,
+    ShootingTargetCategory Category,
+    double? PositionAngleDeg);
 
 /// <summary>
 /// All data needed to render a star hop map.
@@ -75,4 +88,25 @@ public sealed class StarMapData
     public bool IsNearZenithSensitive { get; init; }
 
     public string OrientationSummary { get; init; } = "North-up chart";
+
+    /// <summary>
+    /// The object-type category of the primary target (e.g. Galaxy, Nebula).
+    /// </summary>
+    public ShootingTargetCategory TargetCategory { get; init; }
+
+    /// <summary>
+    /// Position angle of the primary target's major axis, degrees East of North (0–180).
+    /// Only meaningful when <see cref="TargetCategory"/> is <see cref="ShootingTargetCategory.Galaxy"/>.
+    /// </summary>
+    public double? TargetPositionAngleDeg { get; init; }
+
+    /// <summary>
+    /// Other catalog targets that fall within the current map viewport, excluding the primary target.
+    /// </summary>
+    public required IReadOnlyList<StarMapNearbyTarget> NearbyTargets { get; init; }
+
+    /// <summary>
+    /// Scale multiplier applied to all star-map label font sizes. 1.0 is default.
+    /// </summary>
+    public float LabelScale { get; init; } = 1f;
 }

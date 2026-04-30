@@ -61,8 +61,6 @@ internal sealed class ArCoreGLView : GLSurfaceView, GLSurfaceView.IRenderer
             config.SetPlaneFindingMode(Config.PlaneFindingMode.Disabled!);
             config.SetDepthMode(Config.DepthMode.Disabled!);
             config.SetAugmentedImageDatabase(null);
-            config.GeospatialMode = Config.GeospatialMode.Disabled;
-            config.CloudAnchorMode = Config.CloudAnchorMode.Disabled;
             _session.Configure(config);
 
             _sessionInitialized = true;

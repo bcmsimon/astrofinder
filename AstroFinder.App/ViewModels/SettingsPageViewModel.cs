@@ -10,12 +10,14 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
     private readonly ArCameraService _arCameraService;
     private readonly ArDebugFixtureReplayService _arDebugFixtureReplayService;
     private readonly MountSelectionService _mountSelectionService;
+    private readonly LabelScaleService _labelScaleService;
     private bool _useLocationOrientation;
     private bool _invertParallacticAngleForDisplay;
     private bool _useArCamera;
     private bool _showArDebugHud;
     private bool _useArDebugFixtureReplay;
     private bool _isBusy;
+    private float _labelScale;
     private string _selectedMountText = "No mount selected";
     private string _statusText = "Location access is off. Star hop maps use a north-up chart.";
     private string _arStatusText = "AR sky view is off. Enable to use the live camera viewfinder.";
@@ -27,12 +29,14 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         ObserverOrientationService observerOrientationService,
         ArCameraService arCameraService,
         ArDebugFixtureReplayService arDebugFixtureReplayService,
-        MountSelectionService mountSelectionService)
+        MountSelectionService mountSelectionService,
+        LabelScaleService labelScaleService)
     {
         _observerOrientationService = observerOrientationService;
         _arCameraService = arCameraService;
         _arDebugFixtureReplayService = arDebugFixtureReplayService;
         _mountSelectionService = mountSelectionService;
+        _labelScaleService = labelScaleService;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -58,6 +62,23 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
             OnPropertyChanged();
         }
     }
+
+    public float LabelScale
+    {
+        get => _labelScale;
+        private set
+        {
+            if (Math.Abs(_labelScale - value) < 0.001f) return;
+            _labelScale = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(LabelScaleSampleFontSize));
+            OnPropertyChanged(nameof(LabelScalePercent));
+        }
+    }
+
+    public float LabelScaleSampleFontSize => Math.Clamp(_labelScale * 14f, 8f, 22f);
+
+    public string LabelScalePercent => $"{(int)Math.Round(_labelScale * 100)}%";
 
     public bool InvertParallacticAngleForDisplay
     {
@@ -168,6 +189,7 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         ShowArDebugHud = Preferences.Default.Get(ShowArDebugHudKey, false);
         UseArDebugFixtureReplay = _arDebugFixtureReplayService.IsEnabled;
         ArDebugFixtureStatusText = FormatArDebugFixtureStatus();
+        LabelScale = _labelScaleService.LabelScale;
     }
 
     public Task<IReadOnlyList<string>> GetAvailableMountNamesAsync()
@@ -220,6 +242,12 @@ public sealed class SettingsPageViewModel : INotifyPropertyChanged
         _arDebugFixtureReplayService.SetEnabled(enabled);
         UseArDebugFixtureReplay = _arDebugFixtureReplayService.IsEnabled;
         ArDebugFixtureStatusText = FormatArDebugFixtureStatus();
+    }
+
+    public void ApplyLabelScale(float scale)
+    {
+        _labelScaleService.LabelScale = scale;
+        LabelScale = _labelScaleService.LabelScale;
     }
 
     public IReadOnlyList<ArDebugFixtureOption> GetAvailableArDebugFixtures()

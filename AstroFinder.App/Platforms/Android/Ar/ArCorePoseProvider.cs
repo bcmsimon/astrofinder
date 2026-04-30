@@ -6,7 +6,7 @@ using Microsoft.Maui.ApplicationModel;
 namespace AstroFinder.App.Platforms.Android.Ar;
 
 /// <summary>
-/// Implements <see cref="Services.IDeviceOrientationService"/> using ARCore camera poses
+/// Implements <see cref="global::AstroFinder.App.Services.IDeviceOrientationService"/> using ARCore camera poses
 /// rather than raw sensor data. Uses the device compass once at session start to
 /// establish absolute heading, then relies on ARCore's visual-inertial odometry.
 /// </summary>

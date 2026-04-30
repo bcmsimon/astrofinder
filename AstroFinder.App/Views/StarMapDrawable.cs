@@ -1,3 +1,4 @@
+using AstroApps.Equipment.Profiles.Enums;
 using AstroFinder.Engine.Geometry;
 using AstroFinder.Engine.Primitives;
 
@@ -29,16 +30,17 @@ public sealed class StarMapDrawable : IDrawable
         }
 
         var pageBackground = ResolveColor("ColorBackground", "#F6F8FC");
-        var plotBackground = ResolveColor("ColorSurface", "#FFFFFF");
+        var plotBackground = Color.FromArgb("#111830");  // astronomy dark navy — always
         var borderColor = ResolveColor("ColorBorder", "#D4DBEA");
-        var textPrimary = ResolveColor("ColorTextPrimary", "#101828");
         var textSecondary = ResolveColor("ColorTextSecondary", "#344054");
-        var primary = ResolveColor("ColorPrimary", "#2457D6");
-        var accent = ResolveColor("ColorAccent", "#D97706");
-        var success = ResolveColor("ColorSuccess", "#15803D");
-        var error = ResolveColor("ColorError", "#B91C1C");
-        var dimStar = textSecondary.WithAlpha(0.35f);
-        var gridColor = borderColor.WithAlpha(0.7f);
+        var primary = Color.FromArgb("#6B8AF5");
+        var accent = Color.FromArgb("#FBBF24");
+        var success = Color.FromArgb("#34D399");
+        var error = Color.FromArgb("#F87171");
+        var dimStar = Color.FromArgb("#C8D4F0");
+        var gridColor = Color.FromRgba(255, 255, 255, 25);
+        var labelColor = Color.FromArgb("#E4EAFF");
+        var nearbyColor = Color.FromArgb("#22D3EE");
 
         canvas.FillColor = pageBackground;
         canvas.FillRectangle(dirtyRect);
@@ -154,7 +156,7 @@ public sealed class StarMapDrawable : IDrawable
         {
             var pt = ToCanvas(star.RaHours, star.DecDeg);
             var r = StarRadius(star.Magnitude) * 1.1f;
-            canvas.FillColor = dimStar.WithAlpha(BackgroundStarAlpha(star.Magnitude) * 0.6f);
+            canvas.FillColor = dimStar.WithAlpha(BackgroundStarAlpha(star.Magnitude) * 0.5f);
             canvas.FillCircle(pt, r);
         }
 
@@ -230,17 +232,75 @@ public sealed class StarMapDrawable : IDrawable
             canvas.DrawCircle(anchorPoint.Value, StarRadius(anchor.Magnitude) + 5f);
         }
 
+        // Nearby catalog targets — only draw those whose projection lands inside the viewport
+        var displayRotationDeg = _data.UseObserverOrientation ? _data.DisplayRotationDegrees : 0.0;
+        foreach (var nearby in _data.NearbyTargets)
+        {
+            var pt = ToCanvas(nearby.RaHours, nearby.DecDeg);
+            if (!usableRect.Contains(pt))
+                continue;
+            if (nearby.Category == ShootingTargetCategory.Galaxy)
+            {
+                var pa = nearby.PositionAngleDeg ?? 0.0;
+                var rotateDeg = (float)(180.0 + displayRotationDeg - pa);
+                canvas.SaveState();
+                canvas.Translate(pt.X, pt.Y);
+                canvas.Rotate(rotateDeg);
+                canvas.FillColor = nearbyColor.WithAlpha(0.15f);
+                canvas.StrokeColor = nearbyColor;
+                canvas.StrokeSize = 2f;
+                canvas.FillEllipse(-6f, -14f, 12f, 28f);
+                canvas.DrawEllipse(-6f, -14f, 12f, 28f);
+                canvas.StrokeColor = nearbyColor.WithAlpha(0.5f);
+                canvas.StrokeSize = 1.5f;
+                canvas.DrawEllipse(-9f, -20f, 18f, 40f);
+                canvas.RestoreState();
+            }
+            else
+            {
+                canvas.FillColor = nearbyColor.WithAlpha(0.15f);
+                canvas.StrokeColor = nearbyColor;
+                canvas.StrokeSize = 2f;
+                canvas.FillCircle(pt, 7f);
+                canvas.DrawCircle(pt, 7f);
+                canvas.StrokeColor = nearbyColor.WithAlpha(0.5f);
+                canvas.StrokeSize = 1.5f;
+                canvas.DrawCircle(pt, 11f);
+            }
+        }
+
         var targetPoint = ToCanvas(_data.Target.RaHours, _data.Target.DecDeg);
-        canvas.StrokeColor = error;
         canvas.StrokeSize = 2.2f;
         var targetSize = 10f;
-        canvas.DrawLine(targetPoint.X - targetSize, targetPoint.Y, targetPoint.X + targetSize, targetPoint.Y);
-        canvas.DrawLine(targetPoint.X, targetPoint.Y - targetSize, targetPoint.X, targetPoint.Y + targetSize);
-        canvas.DrawCircle(targetPoint, targetSize * 0.7f);
+
+        if (_data.TargetCategory == ShootingTargetCategory.Galaxy)
+        {
+            var pa = _data.TargetPositionAngleDeg ?? 0.0;
+            var rotateDeg = (float)(180.0 + displayRotationDeg - pa);
+            canvas.SaveState();
+            canvas.Translate(targetPoint.X, targetPoint.Y);
+            canvas.Rotate(rotateDeg);
+            canvas.FillColor = error.WithAlpha(0.12f);
+            canvas.FillEllipse(-7f, -16f, 14f, 32f);
+            canvas.StrokeColor = error;
+            canvas.DrawEllipse(-7f, -16f, 14f, 32f);
+            canvas.RestoreState();
+            canvas.StrokeColor = error;
+            var smallArm = targetSize * 0.6f;
+            canvas.DrawLine(targetPoint.X - smallArm, targetPoint.Y, targetPoint.X + smallArm, targetPoint.Y);
+            canvas.DrawLine(targetPoint.X, targetPoint.Y - smallArm, targetPoint.X, targetPoint.Y + smallArm);
+        }
+        else
+        {
+            canvas.StrokeColor = error;
+            canvas.DrawLine(targetPoint.X - targetSize, targetPoint.Y, targetPoint.X + targetSize, targetPoint.Y);
+            canvas.DrawLine(targetPoint.X, targetPoint.Y - targetSize, targetPoint.X, targetPoint.Y + targetSize);
+            canvas.DrawCircle(targetPoint, targetSize * 0.7f);
+        }
 
         canvas.RestoreState();
 
-        canvas.FontColor = textSecondary;
+        canvas.FontColor = Color.FromArgb("#A0AABB");
         canvas.FontSize = 10;
         canvas.DrawString($"via {_data.AsterismName}", plotRect.Left + 12, plotRect.Top + 8, HorizontalAlignment.Left);
         canvas.DrawString("N", plotRect.Left + (plotRect.Width / 2f), plotRect.Top + 8, HorizontalAlignment.Center);
@@ -297,23 +357,32 @@ public sealed class StarMapDrawable : IDrawable
         }
 
         var placedLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var ls = _data.LabelScale;
 
-        PlaceLabel(canvas, usableRect, occupiedAreas, targetPoint, _data.Target.Label, error, plotBackground, borderColor, centerPoint, 12f, targetSize + 4f, placedLabels);
+        PlaceLabel(canvas, usableRect, occupiedAreas, targetPoint, _data.Target.Label, labelColor, plotBackground, borderColor, centerPoint, 12f * ls, targetSize + 4f, placedLabels);
 
         if (_data.HopSteps.Count > 0)
         {
             var anchor = _data.HopSteps[0];
-            PlaceLabel(canvas, usableRect, occupiedAreas, anchorPoint ?? ToCanvas(anchor.RaHours, anchor.DecDeg), anchor.Label, success, plotBackground, borderColor, centerPoint, 11f, StarRadius(anchor.Magnitude) + 6f, placedLabels);
+            PlaceLabel(canvas, usableRect, occupiedAreas, anchorPoint ?? ToCanvas(anchor.RaHours, anchor.DecDeg), anchor.Label, labelColor, plotBackground, borderColor, centerPoint, 11f * ls, StarRadius(anchor.Magnitude) + 6f, placedLabels);
         }
 
         foreach (var step in _data.HopSteps.Skip(1))
         {
-            PlaceLabel(canvas, usableRect, occupiedAreas, ToCanvas(step.RaHours, step.DecDeg), step.Label, accent, plotBackground, borderColor, centerPoint, 10f, StarRadius(step.Magnitude) + 5f, placedLabels);
+            PlaceLabel(canvas, usableRect, occupiedAreas, ToCanvas(step.RaHours, step.DecDeg), step.Label, labelColor, plotBackground, borderColor, centerPoint, 10f * ls, StarRadius(step.Magnitude) + 5f, placedLabels);
         }
 
         foreach (var star in _data.AsterismStars)
         {
-            PlaceLabel(canvas, usableRect, occupiedAreas, ToCanvas(star.RaHours, star.DecDeg), star.Label, textPrimary, plotBackground, borderColor, centerPoint, 10f, StarRadius(star.Magnitude) + 4f, placedLabels);
+            PlaceLabel(canvas, usableRect, occupiedAreas, ToCanvas(star.RaHours, star.DecDeg), star.Label, labelColor, plotBackground, borderColor, centerPoint, 10f * ls, StarRadius(star.Magnitude) + 4f, placedLabels);
+        }
+
+        foreach (var nearby in _data.NearbyTargets)
+        {
+            var nearbyPt = ToCanvas(nearby.RaHours, nearby.DecDeg);
+            if (!usableRect.Contains(nearbyPt))
+                continue;
+            PlaceLabel(canvas, usableRect, occupiedAreas, nearbyPt, nearby.Label, nearbyColor, plotBackground, borderColor, centerPoint, 9f * ls, 9f, placedLabels);
         }
     }
 

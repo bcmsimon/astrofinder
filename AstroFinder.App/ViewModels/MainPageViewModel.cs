@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using AstroApps.Equipment.Profiles.Enums;
 using AstroApps.Equipment.Profiles.Models;
 using AstroFinder.App.Services;
 using AstroFinder.Engine.Anchors;
@@ -17,6 +18,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     private readonly AppCatalogProvider _catalog;
     private readonly ObserverOrientationService _observerOrientationService;
     private readonly ManualGotoCalibrationService _manualGotoCalibrationService;
+    private readonly LabelScaleService _labelScaleService;
     private readonly AnchorSelector _anchorSelector = new();
     private readonly HopGenerator _hopGenerator = new();
 
@@ -51,11 +53,13 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
     public MainPageViewModel(
         AppCatalogProvider catalog,
         ObserverOrientationService observerOrientationService,
-        ManualGotoCalibrationService manualGotoCalibrationService)
+        ManualGotoCalibrationService manualGotoCalibrationService,
+        LabelScaleService labelScaleService)
     {
         _catalog = catalog;
         _observerOrientationService = observerOrientationService;
         _manualGotoCalibrationService = manualGotoCalibrationService;
+        _labelScaleService = labelScaleService;
 
         BuildMapCommand = new Command(async () => await BuildStarHopMapAsync(), () => _selectedTarget is not null);
         ShowDeltasCommand = new Command(ShowDeltas, () => _selectedTarget is not null && _selectedStar is not null && HasSelectedMount());
@@ -214,7 +218,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
                 .OrderBy(x => x.Rank)
                 .ThenBy(x => x.Star.VisualMagnitude)
                 .ThenBy(x => x.Star.DisplayName, StringComparer.OrdinalIgnoreCase)
-                .Take(25)
+                .Take(50)
                 .Select(x => x.Star)
                 .ToList();
         }
@@ -533,20 +537,84 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
         var targetCoord = new EquatorialCoordinate(_selectedTarget.RightAscensionHours, _selectedTarget.DeclinationDeg);
 
-        var anchor = _anchorSelector.FindBestAnchor(
-            targetCoord,
-            _catalog.GetAsterisms(),
-            _catalog.FindStarByHipparcosId);
+        // When the user explicitly chose a reference star, prefer an asterism that
+        // contains that star so the map pattern matches their chosen starting point.
+        // If the selected star belongs to no asterism, use it as a standalone anchor
+        // (empty asterism — no pattern lines drawn). Only fall back to auto-selection
+        // when no reference star has been chosen.
+        AnchorResult? anchor;
+        CatalogStar referenceStar;
 
-        if (anchor is null)
+        if (_selectedStar is not null)
         {
-            ResultText = $"No nearby asterism found for {_selectedTarget.DisplayName}.\n\n" +
-                         $"Target position: RA {FormatRa(_selectedTarget.RightAscensionHours)}, Dec {FormatDec(_selectedTarget.DeclinationDeg)}";
-            HasResult = true;
-            return;
-        }
+            referenceStar = _selectedStar;
+            anchor = _selectedStar.HipparcosId.HasValue
+                ? _anchorSelector.FindAnchorContainingStar(
+                    _selectedStar.HipparcosId.Value,
+                    _selectedStar,
+                    targetCoord,
+                    _catalog.GetAsterisms())
+                : null;
 
-        var referenceStar = _selectedStar ?? anchor.AnchorStar;
+            // If the chosen star belongs to no asterism, synthesise a bare anchor so
+            // the rest of the pipeline can continue without an asterism pattern.
+            anchor ??= new AnchorResult
+            {
+                Asterism = new AstroApps.Equipment.Profiles.Models.CatalogAsterism
+                {
+                    Id = "user-selected",
+                    DisplayName = referenceStar.DisplayName,
+                },
+                AnchorStar = referenceStar,
+                AngularDistanceDegrees = AstroFinder.Engine.Geometry.SphericalGeometry.AngularSeparationDegrees(
+                    new EquatorialCoordinate(referenceStar.RightAscensionHours, referenceStar.DeclinationDeg),
+                    targetCoord),
+                Score = 0.0,
+            };
+        }
+        else
+        {
+            // Prefer the nearest bright star (same logic as the suggestion text) as reference
+            // before falling back to asterism auto-selection.  This avoids drawing a distant
+            // familiar asterism (e.g. Big Dipper for M3) when a closer bright star such as
+            // Arcturus provides a shorter, cleaner route.  A bare anchor (no StarIds/Segments)
+            // is synthesised so no asterism pattern is drawn on the map.
+            var autoStar = FindSuggestedStar(_selectedTarget!);
+            if (autoStar is not null)
+            {
+                referenceStar = autoStar;
+                anchor = new AnchorResult
+                {
+                    Asterism = new AstroApps.Equipment.Profiles.Models.CatalogAsterism
+                    {
+                        Id = "auto-suggested",
+                        DisplayName = autoStar.DisplayName,
+                    },
+                    AnchorStar = autoStar,
+                    AngularDistanceDegrees = AstroFinder.Engine.Geometry.SphericalGeometry.AngularSeparationDegrees(
+                        new EquatorialCoordinate(autoStar.RightAscensionHours, autoStar.DeclinationDeg),
+                        targetCoord),
+                    Score = 0.0,
+                };
+            }
+            else
+            {
+                anchor = _anchorSelector.FindBestAnchor(
+                    targetCoord,
+                    _catalog.GetAsterisms(),
+                    _catalog.FindStarByHipparcosId);
+
+                if (anchor is null)
+                {
+                    ResultText = $"No nearby asterism found for {_selectedTarget.DisplayName}.\n\n" +
+                                 $"Target position: RA {FormatRa(_selectedTarget.RightAscensionHours)}, Dec {FormatDec(_selectedTarget.DeclinationDeg)}";
+                    HasResult = true;
+                    return;
+                }
+
+                referenceStar = anchor.AnchorStar;
+            }
+        }
         var useObserverOrientationRequested = _observerOrientationService.IsLocationOrientationEnabled;
         var observerContext = await _observerOrientationService.TryGetObserverContextAsync();
 
@@ -718,6 +786,23 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
         var mapFillRadius = Math.Max(maxSepFromMapCenter * 1.7, 8.0);
 
+        var nearbyTargets = _catalog.GetTargets()
+            .Where(t => !string.Equals(t.Id, _selectedTarget.Id, StringComparison.OrdinalIgnoreCase))
+            .Select(t =>
+            {
+                var coord = new EquatorialCoordinate(t.RightAscensionHours, t.DeclinationDeg);
+                return (Target: t, Dist: SphericalGeometry.AngularSeparationDegrees(mapCenter, coord));
+            })
+            .Where(x => x.Dist <= mapFillRadius)
+            .Select(x => new StarMapNearbyTarget(
+                x.Target.RightAscensionHours,
+                x.Target.DeclinationDeg,
+                x.Target.VisualMagnitude ?? 10.0,
+                x.Target.DisplayName,
+                x.Target.Category,
+                x.Target.PositionAngleDeg))
+            .ToList();
+
         var allPlottedIds = new HashSet<int>(drawnHipIds);
         foreach (var entry in selectedBackgroundEntries)
         {
@@ -744,7 +829,7 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
         SkyOrientationResult? orientation = null;
         if (observerContext is not null)
         {
-            orientation = SkyOrientationService.GetChartOrientation(
+            orientation = AstroFinder.Engine.Geometry.SkyOrientationService.GetChartOrientation(
                 new ObserverLocation(observerContext.LatitudeDegrees, observerContext.LongitudeDegrees),
                 observerContext.ObservationTime.UtcDateTime,
                 targetCoord,
@@ -780,7 +865,11 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
             InvertParallacticAngleForDisplay = invertParallacticAngleForDisplay,
             IsTargetAboveHorizon = orientation?.IsAboveHorizon ?? true,
             IsNearZenithSensitive = orientation?.IsNearZenithSensitive ?? false,
-            OrientationSummary = orientationSummary
+            OrientationSummary = orientationSummary,
+            TargetCategory = _selectedTarget.Category,
+            TargetPositionAngleDeg = _selectedTarget.PositionAngleDeg,
+            NearbyTargets = nearbyTargets,
+            LabelScale = _labelScaleService.LabelScale
         };
     }
 
@@ -918,15 +1007,89 @@ public sealed class MainPageViewModel : INotifyPropertyChanged
 
     private static int GetStarMatchRank(CatalogStar star, string query)
     {
+        // Exact / prefix / contains pass (existing tiers 0-4)
         var best = GetTextMatchRank(star.DisplayName, query, preferStartsWith: true);
         best = Math.Min(best, GetTextMatchRank(star.Id, query));
+        best = Math.Min(best, GetTextMatchRank(star.BayerDesignation, query));
+
+        // "HIP 12345" explicit search
+        if (star.HipparcosId.HasValue)
+            best = Math.Min(best, GetTextMatchRank($"HIP {star.HipparcosId}", query));
 
         foreach (var alias in star.Aliases)
-        {
             best = Math.Min(best, GetTextMatchRank(alias, query));
+
+        // Fuzzy tier (rank 5) — token-based partial overlap.
+        // Catches "24 UMa" → "24 Ursae Majoris", "alp UMa" → "Alpha Ursae Majoris",
+        // and typos like "Betelgese".
+        if (best == int.MaxValue)
+        {
+            var fuzzyRank = GetStarFuzzyRank(star, query);
+            best = Math.Min(best, fuzzyRank);
         }
 
         return best;
+    }
+
+    /// <summary>
+    /// Fuzzy rank: returns 5 (weak match) or int.MaxValue (no match).
+    /// Checks all tokens in the query appear as substrings within display name / aliases,
+    /// plus a bigram overlap fallback for single-token queries (handles minor typos).
+    /// </summary>
+    private static int GetStarFuzzyRank(CatalogStar star, string query)
+    {
+        var qTokens = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (qTokens.Length == 0)
+            return int.MaxValue;
+
+        // Candidates: displayName + all aliases
+        var candidates = new List<string>(star.Aliases.Count + 2)
+        {
+            star.DisplayName,
+            star.Id,
+        };
+        if (!string.IsNullOrWhiteSpace(star.BayerDesignation))
+            candidates.Add(star.BayerDesignation);
+        if (star.HipparcosId.HasValue)
+            candidates.Add($"HIP {star.HipparcosId}");
+        candidates.AddRange(star.Aliases);
+
+        foreach (var candidate in candidates)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+
+            // All query tokens must appear somewhere in this candidate
+            bool allMatch = qTokens.All(t =>
+                candidate.Contains(t, StringComparison.OrdinalIgnoreCase));
+            if (allMatch)
+                return 5;
+
+            // Single-token query: bigram overlap ≥ 50% catches minor typos
+            if (qTokens.Length == 1 && BigramOverlap(qTokens[0], candidate) >= 0.5)
+                return 6;
+        }
+
+        return int.MaxValue;
+    }
+
+    private static double BigramOverlap(string a, string b)
+    {
+        static HashSet<string> Bigrams(string s)
+        {
+            s = s.ToLowerInvariant();
+            var set = new HashSet<string>();
+            for (var i = 0; i < s.Length - 1; i++)
+                set.Add(s.Substring(i, 2));
+            return set;
+        }
+
+        var ba = Bigrams(a);
+        var bb = Bigrams(b);
+        if (ba.Count == 0 || bb.Count == 0)
+            return 0;
+        var shared = ba.Count(x => bb.Contains(x));
+        return (2.0 * shared) / (ba.Count + bb.Count);
     }
 
     private static int GetTextMatchRank(string? text, string query, bool preferStartsWith = false)

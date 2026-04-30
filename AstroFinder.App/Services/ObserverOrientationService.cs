@@ -100,4 +100,41 @@ public sealed class ObserverOrientationService
             return null;
         }
     }
+
+    /// <summary>
+    /// Always attempts to obtain the device location for the AR overlay, regardless of the
+    /// "use location orientation" preference. Location is required for correct Alt/Az projection.
+    /// Requests permission if not already granted. Returns null only if permission is denied
+    /// or the device cannot provide a fix.
+    /// </summary>
+    public async Task<ObserverOrientationContext?> GetArObserverContextAsync()
+    {
+        var status = await MainThread.InvokeOnMainThreadAsync(
+            () => Permissions.CheckStatusAsync<Permissions.LocationWhenInUse>());
+
+        if (status != PermissionStatus.Granted)
+        {
+            status = await MainThread.InvokeOnMainThreadAsync(
+                () => Permissions.RequestAsync<Permissions.LocationWhenInUse>());
+        }
+
+        if (status != PermissionStatus.Granted)
+            return null;
+
+        try
+        {
+            var location = await Geolocation.Default.GetLastKnownLocationAsync();
+            location ??= await Geolocation.Default.GetLocationAsync(
+                new GeolocationRequest(GeolocationAccuracy.Medium, TimeSpan.FromSeconds(10)));
+
+            if (location is null)
+                return null;
+
+            return new ObserverOrientationContext(location.Latitude, location.Longitude, DateTimeOffset.Now);
+        }
+        catch
+        {
+            return null;
+        }
+    }
 }

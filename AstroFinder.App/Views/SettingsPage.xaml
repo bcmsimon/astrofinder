@@ -213,6 +213,69 @@
                     </VerticalStackLayout>
                 </Border>
 
+                <!-- Label size card -->
+                <Border BackgroundColor="{DynamicResource ColorSurface}"
+                        Stroke="{DynamicResource ColorBorder}"
+                        StrokeThickness="1"
+                        StrokeShape="RoundRectangle 14"
+                        Padding="16">
+                    <VerticalStackLayout Spacing="12">
+                        <Label Text="Label size"
+                               FontAttributes="Bold"
+                               FontSize="15"
+                               TextColor="{DynamicResource ColorTextPrimary}" />
+                        <Label Text="Scales the star name and target labels on star hop maps and the AR view."
+                               FontSize="13"
+                               TextColor="{DynamicResource ColorTextSecondary}"
+                               LineBreakMode="WordWrap" />
+
+                        <!-- Slider + percentage -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <Slider x:Name="LabelScaleSlider"
+                                    Minimum="0.7"
+                                    Maximum="1.5"
+                                    Value="{Binding LabelScale}"
+                                    MinimumTrackColor="{DynamicResource ColorPrimary}"
+                                    ThumbColor="{DynamicResource ColorPrimary}"
+                                    ValueChanged="OnLabelScaleChanged"
+                                    VerticalOptions="Center" />
+                            <Label Grid.Column="1"
+                                   Text="{Binding LabelScalePercent}"
+                                   FontSize="13"
+                                   TextColor="{DynamicResource ColorTextSecondary}"
+                                   WidthRequest="44"
+                                   HorizontalTextAlignment="End"
+                                   VerticalOptions="Center" />
+                        </Grid>
+
+                        <!-- Live preview -->
+                        <Border BackgroundColor="{DynamicResource ColorBackground}"
+                                Stroke="{DynamicResource ColorBorder}"
+                                StrokeThickness="1"
+                                StrokeShape="RoundRectangle 8"
+                                Padding="12,8">
+                            <HorizontalStackLayout Spacing="12">
+                                <Ellipse Fill="{DynamicResource ColorPrimary}"
+                                         WidthRequest="10"
+                                         HeightRequest="10"
+                                         VerticalOptions="Center" />
+                                <Label Text="Bode's Galaxy"
+                                       FontSize="{Binding LabelScaleSampleFontSize}"
+                                       TextColor="{DynamicResource ColorTextPrimary}"
+                                       VerticalOptions="Center" />
+                                <Ellipse Fill="{DynamicResource ColorAccent}"
+                                         WidthRequest="7"
+                                         HeightRequest="7"
+                                         VerticalOptions="Center" />
+                                <Label Text="Dubhe"
+                                       FontSize="{Binding LabelScaleSampleFontSize}"
+                                       TextColor="{DynamicResource ColorTextSecondary}"
+                                       VerticalOptions="Center" />
+                            </HorizontalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </Border>
+
             </VerticalStackLayout>
         </ScrollView>
 

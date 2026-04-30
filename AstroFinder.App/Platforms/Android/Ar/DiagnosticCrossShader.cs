@@ -39,7 +39,7 @@ internal static class DiagnosticCrossShader
 
         _vertexBuffer = ByteBuffer
             .AllocateDirect(VertexData.Length * sizeof(float))
-            .Order(ByteOrder.NativeOrder())
+            .Order(ByteOrder.NativeOrder()!)
             .AsFloatBuffer();
         _vertexBuffer.Put(VertexData);
         _vertexBuffer.Position(0);

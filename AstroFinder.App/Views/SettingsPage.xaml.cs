@@ -117,4 +117,10 @@ public partial class SettingsPage : ContentPage
             _viewModel.ApplySelectedArDebugFixture(selected.Id);
         }
     }
+
+    private void OnLabelScaleChanged(object? sender, ValueChangedEventArgs e)
+    {
+        if (_isInitializing) return;
+        _viewModel.ApplyLabelScale((float)e.NewValue);
+    }
 }

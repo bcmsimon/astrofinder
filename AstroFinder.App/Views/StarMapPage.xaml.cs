@@ -35,7 +35,7 @@ public partial class StarMapPage : ContentPage
 
         SummaryLabel.Text = $"Target: {data.Target.Label}  •  {referenceText}" +
                             (hopCount > 0 ? $"  •  {hopCount} hop{(hopCount != 1 ? "s" : "")}" : "  •  Direct") +
-                            $"\n{data.OrientationSummary}  •  Native pinch zoom";
+                            $"\n{data.OrientationSummary}";
     }
 
     protected override void OnAppearing()
@@ -112,10 +112,16 @@ public partial class StarMapPage : ContentPage
             status = await Permissions.RequestAsync<Permissions.Camera>();
         }
 
-        // Navigate regardless — the AR page gracefully uses a dark background
-        // when the camera is unavailable.
+        // Navigate regardless — the overlay page gracefully handles unavailable sensors.
         _ = status; // used above; explicit discard avoids warning
-        await Navigation.PushModalAsync(new ArStarHopPage());
+        var page = IPlatformApplication.Current!.Services.GetRequiredService<SkyOverlayPage>();
+        page.SetTarget(_data.Target.RaHours, _data.Target.DecDeg, _data.Target.Label ?? string.Empty);
+        if (_data.HopSteps.Count > 0)
+        {
+            var refStar = _data.HopSteps[0];
+            page.SetReference(refStar.RaHours, refStar.DecDeg, refStar.Label ?? string.Empty);
+        }
+        await Navigation.PushModalAsync(page);
     }
 
     private async void OnCloseClicked(object? sender, EventArgs e)

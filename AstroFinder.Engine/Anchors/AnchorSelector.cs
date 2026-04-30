@@ -65,6 +65,36 @@ public sealed class AnchorSelector
         return best;
     }
 
+    /// <summary>
+    /// Finds the asterism that contains <paramref name="hipparcosId"/> and returns it with that
+    /// star as the anchor. Returns null if no asterism contains the star.
+    /// </summary>
+    public AnchorResult? FindAnchorContainingStar(
+        int hipparcosId,
+        CatalogStar star,
+        EquatorialCoordinate target,
+        IReadOnlyList<CatalogAsterism> asterisms)
+    {
+        var starCoord = new EquatorialCoordinate(star.RightAscensionHours, star.DeclinationDeg);
+        var distance = SphericalGeometry.AngularSeparationDegrees(starCoord, target);
+
+        foreach (var asterism in asterisms)
+        {
+            if (asterism.StarIds.Contains(hipparcosId))
+            {
+                return new AnchorResult
+                {
+                    Asterism = asterism,
+                    AnchorStar = star,
+                    AngularDistanceDegrees = distance,
+                    Score = 0.0,
+                };
+            }
+        }
+
+        return null;
+    }
+
     private static double ComputeAlignmentScore(
         CatalogAsterism asterism,
         EquatorialCoordinate target,
